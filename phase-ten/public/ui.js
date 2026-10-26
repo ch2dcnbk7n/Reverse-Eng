@@ -185,7 +185,8 @@ export function mountApp(root, transport) {
 
   transport.init((snap) => {
     const prev = ui.snap.view;
-    const same = snap.view && prev && ui.snap.code === snap.code && prev.seq === snap.view.seq && prev.me === snap.view.me;
+    const same =
+      snap.view && prev && ui.snap.code === snap.code && prev.seq === snap.view.seq && prev.me === snap.view.me && !ui.snap.offline === !snap.offline;
     ui.snap = snap;
     if (same) return; // the same update echoed back; redrawing would restart animations
     // Drop selections for cards that left the hand.
@@ -437,7 +438,7 @@ export function mountApp(root, transport) {
       .join("");
 
     return `<div class="topbar">
-        <span class="room">Room <b>${esc(ui.snap.code)}</b> · Hand ${v.handNo}</span>
+        <span class="room">Room <b>${esc(ui.snap.code)}</b> · Hand ${v.handNo}${ui.snap.offline ? ' <span class="offline">Reconnecting…</span>' : ""}</span>
         <button type="button" class="link" data-do="leave">Leave</button>
       </div>
       <ul class="seats">${seats}</ul>
@@ -524,6 +525,11 @@ export function mountApp(root, transport) {
     if (s.screen === "loading") body = `<div class="center-msg"><span class="dots"><i></i><i></i><i></i></span><p>${esc(s.message || "Loading…")}</p></div>`;
     else if (s.screen === "unavailable") body = `<section class="panel"><h1 class="logo small-logo"><span class="logo-ten">Phase Ten</span></h1><p>${esc(s.message)}</p>${webLinkHtml()}</section>`;
     else if (s.screen === "home") body = homeHtml();
+    else if (s.screen === "lost")
+      body = `<section class="panel lost"><h2>Can't reach room ${esc(s.code)}</h2>
+        <p class="muted">The game server didn't answer. Your game is saved, so you can try again, or start fresh.</p>
+        <div class="row"><button type="button" class="btn primary grow" data-do="retry">Try again</button>
+        <button type="button" class="btn grow" data-do="leave">Back to start</button></div></section>`;
     else if (s.view.status === "lobby") body = lobbyHtml(s.view);
     else body = gameHtml(s.view);
     const focusId = document.activeElement && document.activeElement.id;
@@ -628,6 +634,8 @@ export function mountApp(root, transport) {
         else setToast(url);
         return;
       }
+      case "retry":
+        return transport.retry();
       case "leave":
         ui.selected = [];
         return run(() => transport.leave());

@@ -2,6 +2,7 @@
 import { mountApp } from "./ui.js";
 
 const POLL_MS = 1500;
+const GIVE_UP_AFTER = 3; // failed polls before telling the player
 const saved = {
   get(key) {
     try {
@@ -34,13 +35,14 @@ function createWebTransport() {
   let session = saved.get("p10-session"); // {code, token}
   let view = null;
   let timer = null;
+  let failures = 0;
   const params = new URLSearchParams(location.search);
   const prefillCode = (params.get("room") || "").toUpperCase();
 
   const home = () => emit({ screen: "home", defaultName: saved.get("p10-name") || "", prefillCode });
   const show = (v) => {
     view = v;
-    emit({ screen: "game", code: session.code, view });
+    emit({ screen: "game", code: session.code, view, offline: false });
   };
 
   async function poll() {
@@ -49,13 +51,22 @@ function createWebTransport() {
     try {
       const q = new URLSearchParams({ code: session.code, token: session.token, seq: view ? view.seq : -1 });
       const data = await api(`state?${q}`);
+      const wasOffline = failures >= GIVE_UP_AFTER;
+      failures = 0;
       if (data.view) show(data.view);
+      else if (wasOffline) show(view);
     } catch (e) {
       if (e.status === 403 || e.status === 404) {
         session = null;
         saved.set("p10-session", null);
         view = null;
         return home();
+      }
+      failures++;
+      if (failures >= GIVE_UP_AFTER) {
+        // Rejoining: stop and offer a way out. Mid-game: keep trying and say so.
+        if (!view) return emit({ screen: "lost", code: session.code });
+        emit({ screen: "game", code: session.code, view, offline: true });
       }
     }
     timer = setTimeout(poll, document.hidden ? POLL_MS * 4 : POLL_MS);
@@ -78,6 +89,11 @@ function createWebTransport() {
     listsGames: false,
     shareUrl: (code) => `${location.origin}${location.pathname}?room=${code}`,
     shareHint: () => "Send friends the invite link, or have them enter this code.",
+    retry() {
+      failures = 0;
+      emit({ screen: "loading", message: "Rejoining your game…" });
+      poll();
+    },
     init(fn) {
       emit = fn;
       if (session && (!prefillCode || prefillCode === session.code)) {
