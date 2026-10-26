@@ -128,6 +128,41 @@ function createWebTransport() {
 }
 
 // The hosted site gets Netlify's "Powered by Netlify" badge in the bottom
-// corner; the stylesheet keeps the hand clear of it on phones.
+// corner. Where it sits depends on the browser (Safari's floating toolbar
+// pushes it up), so measure it and tell the stylesheet how much room to leave
+// under the hand on phones.
 document.documentElement.classList.add("hosted");
+
+function visibleRect(el) {
+  const r = el.getBoundingClientRect();
+  if (r.width && r.height) return r;
+  // A zero-size wrapper: use what's drawn inside it.
+  let box = null;
+  for (const child of (el.shadowRoot || el).querySelectorAll("*")) {
+    const c = child.getBoundingClientRect();
+    if (!c.width || !c.height) continue;
+    box = box
+      ? { top: Math.min(box.top, c.top), left: Math.min(box.left, c.left), right: Math.max(box.right, c.right) }
+      : { top: c.top, left: c.left, right: c.right };
+  }
+  return box;
+}
+
+function reserveBadgeSpace() {
+  const dock = document.querySelector(".dock");
+  if (!dock) return;
+  const d = dock.getBoundingClientRect();
+  let top = Infinity;
+  for (const el of document.body.children) {
+    if (el.id === "app" || el.tagName === "SCRIPT" || el.tagName === "NOSCRIPT" || el.tagName === "STYLE") continue;
+    const r = visibleRect(el);
+    // Only something drawn over the right side of the dock counts.
+    if (r && r.right > innerWidth / 2 && r.top > d.top && r.top < d.bottom) top = Math.min(top, r.top);
+  }
+  const root = document.documentElement.style;
+  if (top === Infinity) root.removeProperty("--host-badge");
+  else root.setProperty("--host-badge", `${Math.ceil(d.bottom - top + 12)}px`);
+}
+setInterval(reserveBadgeSpace, 1000);
+addEventListener("resize", reserveBadgeSpace);
 mountApp(document.getElementById("app"), createWebTransport());

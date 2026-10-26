@@ -694,7 +694,8 @@ p { margin: 0; }
 }
 
 @media (max-width: 700px) {
-  .hosted .dock { padding-bottom: calc(62px + env(safe-area-inset-bottom, 0px)); }
+  /* --host-badge is measured by web.js; 62px covers the badge until then. */
+  .hosted .dock { padding-bottom: var(--host-badge, calc(62px + env(safe-area-inset-bottom, 0px))); }
 }
 @media (max-width: 420px) {
   .hand, .hand .card { --w: 58px; }
