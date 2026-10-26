@@ -3,13 +3,18 @@
 A multiplayer Phase Ten card game for 2–6 players. It comes in two versions that share one rules engine and one UI:
 
 - **Website** (`public/` + `netlify/functions/api.mjs`). Hosted on Netlify. The server deals the cards and validates every move, and each player only ever receives their own hand. Friends join with a room code or an invite link.
-- **Claude artifact** (`dist/phase-ten-artifact.html`). A single page that keeps games in the artifact's shared store. Friends open the shared artifact and join from "Open games".
+- **Claude artifact** (`dist/phase-ten-artifact.html`). A single page that keeps games in the artifact's shared store. Friends open the shared artifact and join from "Open tables".
+
+## Bots
+
+The host can tap **Add a bot** in the lobby, or anyone can start **Practice against 2 bots** from the home screen. Bots play through the same rule checks as people. On the website the server plays a bot's turn when someone polls and the bot has waited about a second; in the artifact, every player's browser offers to play it and a short lock lets only one do so.
 
 ## Layout
 
 | Path | What it is |
 |---|---|
 | `public/engine.js` | Rules engine: deck, phases, sets/runs/color groups, wilds, skips, scoring, turn flow |
+| `public/bot.js` | Computer players: finds phases, adds to the table, picks discards, aims Skips at the leader |
 | `public/ui.js` | Table UI, shared by both versions |
 | `public/web.js` | Website transport (HTTP + polling) |
 | `server/handler.js` | API: create, join, state, act. Uses conditional writes so simultaneous moves never overwrite each other |

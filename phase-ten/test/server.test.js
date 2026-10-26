@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { createHandler } from "../server/handler.js";
 import { createMemoryStore } from "../server/memory-store.js";
 
-function client() {
-  const handle = createHandler(createMemoryStore());
+function client(opts) {
+  const handle = createHandler(createMemoryStore(), opts);
   const call = async (path, body) => {
     const res = await handle(
       new Request(`http://x/api/${path}`, body ? { method: "POST", body: JSON.stringify(body) } : {})
@@ -64,4 +64,41 @@ test("simultaneous joins are all kept", async () => {
   assert.ok(results.every((r) => r.status === 200));
   const r = await call(`state?code=${host.code}&token=${host.token}&seq=-1`);
   assert.equal(r.data.view.players.length, 6);
+});
+
+test("bots take their turns when players poll", async () => {
+  const call = client({ botDelayMs: 0 });
+  const host = (await call("create", { name: "Ann" })).data;
+  await call("act", { code: host.code, token: host.token, action: { type: "addBot" } });
+  await call("act", { code: host.code, token: host.token, action: { type: "addBot" } });
+  let view = (await call("act", { code: host.code, token: host.token, action: { type: "start" } })).data.view;
+  assert.equal(view.players.filter((p) => p.bot).length, 2);
+  const poll = async () => (await call(`state?code=${host.code}&token=${host.token}&seq=-1`)).data.view;
+  // Poll until it's the person's turn; bots move one turn per poll.
+  for (let i = 0; i < 30 && view.players[view.turn].bot; i++) view = await poll();
+  assert.equal(view.players[view.turn].id, view.me);
+  assert.equal(view.step, "draw");
+  // On the person's turn polling changes nothing.
+  const seq = view.seq;
+  const again = await poll();
+  assert.equal(again.seq, seq, JSON.stringify(again.log.slice(-4)) + " turn " + again.players[again.turn].name);
+
+  view = (await call("act", { code: host.code, token: host.token, action: { type: "draw", source: "deck" } })).data.view;
+  const me = view.players.find((p) => p.id === view.me);
+  const card = me.hand.find((c) => c.kind !== "skip");
+  view = (await call("act", { code: host.code, token: host.token, action: { type: "discard", cardId: card.id } })).data.view;
+  if (view.status === "playing" && view.players[view.turn].bot) {
+    const after = await poll();
+    assert.ok(after.seq > view.seq, "the bot moved");
+    assert.ok(after.status !== "playing" || after.step === "draw", "and finished its whole turn");
+  }
+});
+
+test("bots wait for the delay before moving", async () => {
+  const call = client({ botDelayMs: 60000 });
+  const host = (await call("create", { name: "Ann" })).data;
+  await call("act", { code: host.code, token: host.token, action: { type: "addBot" } });
+  let view = (await call("act", { code: host.code, token: host.token, action: { type: "start" } })).data.view;
+  const r = await call(`state?code=${host.code}&token=${host.token}&seq=${view.seq}`);
+  assert.deepEqual(r.data, { unchanged: true });
 });

@@ -212,6 +212,22 @@ export function addPlayer(state, id, name) {
   return finish(s);
 }
 
+const BOT_NAMES = ["Robo Rita", "Sprocket", "Gizmo", "Bolt", "Chip", "Widget", "Cog"];
+
+export function addBot(state, byId) {
+  if (state.status !== "lobby") fail("Bots can only join before the game starts.");
+  if (byId !== state.host) fail("Only the host can add bots.");
+  if (state.players.length >= MAX_PLAYERS) fail(`The table is full (${MAX_PLAYERS} players).`);
+  const s = clone(state);
+  const taken = new Set(s.players.map((p) => p.name));
+  const name = BOT_NAMES.find((n) => !taken.has(n)) || `Bot ${s.players.length + 1}`;
+  let n = 1;
+  while (s.players.some((p) => p.id === `bot_${n}`)) n++;
+  s.players.push({ ...newPlayer(`bot_${n}`, name), bot: true });
+  log(s, `${name} (bot) sat down.`);
+  return finish(s);
+}
+
 export function removePlayer(state, byId, id) {
   if (state.status !== "lobby") fail("Players can only leave before the game starts.");
   if (byId !== id && byId !== state.host) fail("Only the host can remove other players.");
@@ -219,7 +235,8 @@ export function removePlayer(state, byId, id) {
   const p = s.players.find((x) => x.id === id);
   if (!p) return state;
   s.players = s.players.filter((x) => x.id !== id);
-  if (s.host === id && s.players.length) s.host = s.players[0].id;
+  const humans = s.players.filter((x) => !x.bot);
+  if (s.host === id && humans.length) s.host = humans[0].id;
   log(s, `${p.name} left.`);
   return finish(s);
 }
@@ -351,12 +368,16 @@ export function discard(state, playerId, cardId, skipTargetId) {
   s.discard.push(card);
   if (card.kind === "skip") {
     const others = s.players.filter((x) => x.id !== p.id);
-    const targetId = others.length === 1 ? others[0].id : skipTargetId;
-    const target = others.find((x) => x.id === targetId);
-    if (!target) fail("Choose who to skip.");
-    if (target.skipped) fail(`${target.name} is already being skipped. Choose someone else.`);
-    target.skipped = true;
-    log(s, `${p.name} discarded a Skip on ${target.name}.`);
+    if (others.every((x) => x.skipped)) {
+      log(s, `${p.name} discarded a Skip, but everyone is already skipped.`);
+    } else {
+      const targetId = others.length === 1 ? others[0].id : skipTargetId;
+      const target = others.find((x) => x.id === targetId);
+      if (!target) fail("Choose who to skip.");
+      if (target.skipped) fail(`${target.name} is already being skipped. Choose someone else.`);
+      target.skipped = true;
+      log(s, `${p.name} discarded a Skip on ${target.name}.`);
+    }
   } else {
     log(s, `${p.name} discarded ${cardLabel(card)}.`);
   }
@@ -406,6 +427,8 @@ export function applyAction(state, playerId, action, rng = Math.random) {
       return addPlayer(state, playerId, action.name);
     case "leave":
       return removePlayer(state, playerId, action.playerId || playerId);
+    case "addBot":
+      return addBot(state, playerId);
     case "start":
       return startGame(state, playerId, rng);
     case "draw":

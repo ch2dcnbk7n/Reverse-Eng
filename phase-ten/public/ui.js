@@ -18,6 +18,7 @@ const initials = (name) =>
     .toUpperCase();
 const reduceMotion = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+const BOT_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5v3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="2.5" r="1.6" fill="currentColor"/><rect x="4" y="6.5" width="16" height="12.5" rx="4" fill="currentColor"/><circle cx="9" cy="12.5" r="2" fill="var(--seat)"/><circle cx="15" cy="12.5" r="2" fill="var(--seat)"/><path d="M1.5 11v4M22.5 11v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
 const SKIP_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="3"/><path d="M6 18 18 6" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`;
 
 function cardHtml(card, { selected = false, attrs = "", small = false, cls = "", style = "" } = {}) {
@@ -43,8 +44,8 @@ function trackHtml(p) {
   return `<span class="track" role="img" aria-label="${label}">${dots}</span>`;
 }
 
-function avatarHtml(name, color, extra = "") {
-  return `<span class="avatar" style="--seat:${color}">${esc(initials(name))}${extra}</span>`;
+function avatarHtml(name, color, extra = "", bot = false) {
+  return `<span class="avatar${bot ? " bot" : ""}" style="--seat:${color}">${bot ? BOT_ICON : esc(initials(name))}${extra}</span>`;
 }
 
 // Short-lived celebration effects drawn above the page.
@@ -266,6 +267,7 @@ export function mountApp(root, transport) {
         <label><span class="lbl">Your name</span>
           <input id="name" maxlength="20" autocomplete="nickname" value="${nameVal}" placeholder="What do your friends call you?"></label>
         <button type="button" class="btn primary big" data-do="create">Start a table</button>
+        <button type="button" class="btn big bots" data-do="solo">${BOT_ICON}Practice against 2 bots</button>
       </section>
       ${joinBlock}
       <details class="panel rules"><summary>How to play</summary>${rulesHtml()}</details>`;
@@ -296,12 +298,16 @@ export function mountApp(root, transport) {
         <h2>At the table <span class="count">${v.players.length}/${MAX_PLAYERS}</span></h2>
         <ul class="seat-grid">${v.players
           .map(
-            (p, i) => `<li class="${ui.seen.has(p.id) ? "" : "pop"}" style="--i:${i}">${avatarHtml(p.name, SEAT_COLORS[i % SEAT_COLORS.length])}
+            (p, i) => `<li class="${ui.seen.has(p.id) ? "" : "pop"}" style="--i:${i}">${avatarHtml(p.name, SEAT_COLORS[i % SEAT_COLORS.length], "", p.bot)}
               <span class="seat-label">${esc(p.name)}</span>
-              <span class="seat-sub">${p.id === v.host ? "Host" : ""}${p.id === v.me ? (p.id === v.host ? " · you" : "You") : ""}</span>
+              <span class="seat-sub">${p.bot ? "Bot" : ""}${p.id === v.host ? "Host" : ""}${p.id === v.me ? (p.id === v.host ? " · you" : "You") : ""}</span>
               ${isHost && p.id !== v.me ? `<button type="button" class="link small" data-kick="${esc(p.id)}">Remove</button>` : ""}</li>`
           )
-          .join("")}${Array.from({ length: MAX_PLAYERS - v.players.length }, () => `<li class="empty-seat"><span class="avatar ghost">+</span></li>`).join("")}</ul>
+          .join("")}${Array.from({ length: MAX_PLAYERS - v.players.length }, (_, k) =>
+          isHost && k === 0
+            ? `<li class="empty-seat"><button type="button" class="add-bot" data-do="add-bot"><span class="avatar ghost">+</span><span class="seat-label">Add a bot</span></button></li>`
+            : `<li class="empty-seat"><span class="avatar ghost"></span></li>`
+        ).join("")}</ul>
         ${
           isHost
             ? `<button type="button" class="btn primary big" data-do="start" ${v.players.length < 2 ? "disabled" : ""}>
@@ -351,7 +357,7 @@ export function mountApp(root, transport) {
         .map((p, i) =>
           p.id === v.me || p.skipped
             ? ""
-            : `<button type="button" class="btn chip-btn" data-skip="${esc(p.id)}">${avatarHtml(p.name, SEAT_COLORS[i % SEAT_COLORS.length])}${esc(p.name)}</button>`
+            : `<button type="button" class="btn chip-btn" data-skip="${esc(p.id)}">${avatarHtml(p.name, SEAT_COLORS[i % SEAT_COLORS.length], "", p.bot)}${esc(p.name)}</button>`
         )
         .join("")}<button type="button" class="link" data-do="cancel-skip">Cancel</button></div>`;
     }
@@ -369,7 +375,7 @@ export function mountApp(root, transport) {
   function statusText(v, d) {
     const turnP = v.players[v.turn];
     if (v.status !== "playing") return "Hand over";
-    if (!d.myTurn) return `${esc(turnP.name)} is thinking…`;
+    if (!d.myTurn) return turnP.bot ? `${esc(turnP.name)} is calculating…` : `${esc(turnP.name)} is thinking…`;
     if (v.step === "draw") return "Your turn · draw";
     if (!d.me.laid) return `Your turn · Phase ${d.me.phase}, then discard`;
     return "Your turn · play cards, then discard";
@@ -387,7 +393,7 @@ export function mountApp(root, transport) {
           (i === v.dealer ? `<b class="dealer" title="Dealer">D</b>` : "") +
           (p.skipped ? `<b class="skipmark" title="Skipped next turn">${SKIP_ICON}</b>` : "");
         return `<li class="seat${active ? " active" : ""}${p.id === v.me ? " me" : ""}${p.skipped ? " skipped" : ""}">
-          ${avatarHtml(p.name, SEAT_COLORS[i % SEAT_COLORS.length], badges)}
+          ${avatarHtml(p.name, SEAT_COLORS[i % SEAT_COLORS.length], badges, p.bot)}
           <div class="seat-info">
             <div class="seat-name">${esc(p.name)}${p.id === v.me ? ' <span class="you">you</span>' : ""}</div>
             <div class="seat-stats"><span class="mini-hand" title="Cards in hand">${p.handCount}</span><span>${p.score} pts</span>${p.laid ? '<span class="done-chip">Phase down</span>' : ""}</div>
@@ -486,7 +492,7 @@ export function mountApp(root, transport) {
             const r = last.results.find((x) => x.id === p.id) || {};
             const i = seatOf(p.id);
             return `<li class="${v.winners.includes(p.id) ? "win" : ""}">
-              ${avatarHtml(p.name, SEAT_COLORS[i % SEAT_COLORS.length])}
+              ${avatarHtml(p.name, SEAT_COLORS[i % SEAT_COLORS.length], "", p.bot)}
               <div class="grow"><strong>${esc(p.name)}</strong>
                 <span class="r-sub ${r.completed ? "ok" : "miss"}">${r.completed ? `Made phase ${r.completed}` : "Missed the phase"} · +${r.points ?? 0}</span>
                 ${trackHtml({ ...p, laid: false })}</div>
@@ -575,6 +581,18 @@ export function mountApp(root, transport) {
       }
       case "start":
         return act({ type: "start" });
+      case "add-bot":
+        return act({ type: "addBot" });
+      case "solo": {
+        const name = nameValue();
+        if (!name) return setToast("Enter your name first.");
+        return run(async () => {
+          await transport.createGame(name);
+          await transport.act({ type: "addBot" });
+          await transport.act({ type: "addBot" });
+          await transport.act({ type: "start" });
+        });
+      }
       case "next":
         return act({ type: "nextHand" });
       case "lay":
@@ -582,7 +600,8 @@ export function mountApp(root, transport) {
       case "discard": {
         const me = v.players.find((p) => p.id === v.me);
         const card = me.hand.find((c) => c.id === ui.selected[0]);
-        if (card && card.kind === "skip" && v.players.length > 2) {
+        const canSkipSomeone = v.players.some((p) => p.id !== v.me && !p.skipped);
+        if (card && card.kind === "skip" && v.players.length > 2 && canSkipSomeone) {
           ui.skipPick = true;
           return refreshSelection();
         }

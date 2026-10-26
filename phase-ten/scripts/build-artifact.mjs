@@ -8,8 +8,9 @@ const stripModule = (src) =>
     .replace(/^import .*;\n/gm, "")
     .replace(/^export (?=(const|function|class) )/gm, "");
 
-const [engine, ui, transport, css] = await Promise.all([
+const [engine, bot, ui, transport, css] = await Promise.all([
   read("public/engine.js"),
+  read("public/bot.js"),
   read("public/ui.js"),
   read("artifact/transport.js"),
   read("public/styles.css"),
@@ -27,6 +28,7 @@ ${css}
 <script>
 (() => {
 ${stripModule(engine)}
+${stripModule(bot)}
 ${stripModule(ui)}
 ${transport}
 mountApp(document.getElementById("app"), createArtifactTransport());

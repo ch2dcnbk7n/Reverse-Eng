@@ -30,16 +30,30 @@ function createArtifactTransport() {
   let games = [];
   let current = null; // latest game state for `code`
   let unsubGame = null;
+  let botTimer = null;
+
+  // Everyone at the table offers to play a waiting bot's turn; the lease and the
+  // version check make sure only one of them actually does.
+  function scheduleBot() {
+    clearTimeout(botTimer);
+    if (!current || !botToMove(current)) return;
+    const seq = current.seq;
+    const gameCode = code;
+    botTimer = setTimeout(() => {
+      withLease(gameCode, (s) => (s && botToMove(s) && s.seq === seq ? safeBotTurn(s) : s)).catch(() => {});
+    }, BOT_DELAY_MS + Math.random() * 600);
+  }
 
   function publish() {
     if (code && current) {
       emit({ screen: "game", code, view: viewFor(current, uid) });
+      scheduleBot();
       return;
     }
     if (code) return emit({ screen: "loading", message: "Opening your game…" });
     const now = Date.now();
     const list = games
-      .filter((g) => g.state && now - g.updated < STALE_MS)
+      .filter((g) => g.state && now - g.updated < STALE_MS && g.state.players.some((p) => !p.bot))
       .filter((g) => g.state.status === "lobby" || g.state.players.some((p) => p.id === uid))
       .filter((g) => g.state.status !== "finished")
       .map((g) => ({
@@ -54,6 +68,7 @@ function createArtifactTransport() {
   function watchGame(next) {
     if (unsubGame) unsubGame();
     unsubGame = null;
+    clearTimeout(botTimer);
     code = next;
     current = null;
     saved.set("p10-code", code);

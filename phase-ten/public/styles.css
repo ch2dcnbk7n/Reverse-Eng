@@ -100,6 +100,8 @@ p { margin: 0; }
 .btn.go { --b: var(--green); --b-d: var(--green-d); color: #fff; }
 .btn.danger { --b: var(--red); --b-d: var(--red-d); color: #fff; }
 .btn.big { font-family: var(--display); font-weight: 400; font-size: 19px; padding: 14px 20px; border-radius: 18px; width: 100%; box-shadow: 0 5px 0 var(--b-d); }
+.btn.bots { --b: var(--surface-2); --b-d: var(--shadow); font-size: 16px; }
+.btn.bots svg { --seat: var(--surface-2); width: 22px; height: 22px; color: var(--ink); }
 .btn .badge { background: #0003; border-radius: 99px; padding: 1px 8px; font-size: 13px; font-variant-numeric: tabular-nums; }
 .chip-btn { padding: 6px 12px 6px 6px; }
 .chip-btn .avatar { --size: 26px; font-size: 11px; }
@@ -180,6 +182,7 @@ p { margin: 0; }
   box-shadow: inset 0 -4px 0 #0003;
   text-shadow: 0 1px 0 #0004;
 }
+.avatar.bot svg { width: 64%; height: 64%; color: #fff; filter: drop-shadow(0 1px 0 #0004); }
 .avatar.ghost { background: transparent; border: 2px dashed var(--line); color: var(--line); box-shadow: none; font-size: 22px; }
 .avatar b {
   position: absolute;
@@ -232,6 +235,9 @@ p { margin: 0; }
 .seat-grid .avatar { --size: 58px; }
 .seat-grid .pop { animation: pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both; animation-delay: calc(var(--i) * 70ms); }
 @keyframes pop { from { transform: scale(0.3); opacity: 0; } }
+.add-bot { background: none; border: 0; padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--muted); }
+.add-bot .avatar.ghost { border-color: var(--yellow); color: var(--yellow); }
+.add-bot:hover .avatar.ghost { background: #ffc21a1a; }
 .seat-label { font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .seat-sub { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; min-height: 1em; }
 .waiting { display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--muted); font-weight: 500; }

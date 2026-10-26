@@ -5,8 +5,12 @@
 //   POST /api/join   {code, name}           -> {code, token}
 //   GET  /api/state?code=&token=&seq=       -> {view} or {unchanged: true}
 //   POST /api/act    {code, token, action}  -> {view}
+//
+// Bots move when someone polls for state and the bot's turn has waited
+// BOT_DELAY_MS, so their turns arrive at a pace people can follow.
 import { randomBytes, randomInt } from "node:crypto";
 import { createGame, applyAction, viewFor, GameError } from "../public/engine.js";
+import { safeBotTurn, botToMove, BOT_DELAY_MS } from "../public/bot.js";
 
 const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I or O, they read like 1 and 0
 const GAME_TTL_MS = 3 * 24 * 60 * 60 * 1000;
@@ -28,7 +32,7 @@ const newPlayerId = () => "p_" + randomBytes(6).toString("hex");
 
 // `store` needs getWithMetadata(key) -> {data, etag} | null and
 // setJSON(key, value, {onlyIfNew | onlyIfMatch}) -> {modified}, as Netlify Blobs provides.
-export function createHandler(store) {
+export function createHandler(store, { botDelayMs = BOT_DELAY_MS } = {}) {
   async function load(code) {
     const entry = await store.getWithMetadata(code, { type: "json", consistency: "strong" });
     if (!entry || !entry.data || entry.data.expires < Date.now()) throw new HttpError(404, "That room doesn't exist or has expired.");
@@ -40,7 +44,8 @@ export function createHandler(store) {
     for (let attempt = 0; attempt < 6; attempt++) {
       const { data, etag } = await load(code);
       const result = change(data);
-      const doc = { ...data, state: result.state, expires: Date.now() + GAME_TTL_MS };
+      if (result.state === data.state) return { doc: data, ...result };
+      const doc = { ...data, state: result.state, at: Date.now(), expires: Date.now() + GAME_TTL_MS };
       const { modified } = await store.setJSON(code, doc, { onlyIfMatch: etag });
       if (modified) return { doc, ...result };
       await new Promise((r) => setTimeout(r, 40 + Math.random() * 120));
@@ -60,7 +65,7 @@ export function createHandler(store) {
         const code = newCode();
         const token = newToken();
         const id = newPlayerId();
-        const doc = { state: createGame(id, body.name), tokens: { [token]: id }, expires: Date.now() + GAME_TTL_MS };
+        const doc = { state: createGame(id, body.name), tokens: { [token]: id }, at: Date.now(), expires: Date.now() + GAME_TTL_MS };
         const { modified } = await store.setJSON(code, doc, { onlyIfNew: true });
         if (modified) return { code, token };
       }
@@ -80,8 +85,15 @@ export function createHandler(store) {
 
     async state(_body, url) {
       const code = String(url.searchParams.get("code") || "").toUpperCase();
-      const { data } = await load(code);
+      let { data } = await load(code);
       const id = playerFor(data, url.searchParams.get("token"));
+      if (botToMove(data.state) && Date.now() - (data.at || 0) >= botDelayMs) {
+        const seq = data.state.seq;
+        // Only move if nobody else already did while we waited for the write.
+        ({ doc: data } = await update(code, (d) => ({
+          state: botToMove(d.state) && d.state.seq === seq ? safeBotTurn(d.state, rng) : d.state,
+        })));
+      }
       const seq = Number(url.searchParams.get("seq"));
       if (seq === data.state.seq) return { unchanged: true };
       return { view: viewFor(data.state, id) };

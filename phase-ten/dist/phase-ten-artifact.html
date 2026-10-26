@@ -106,6 +106,8 @@ p { margin: 0; }
 .btn.go { --b: var(--green); --b-d: var(--green-d); color: #fff; }
 .btn.danger { --b: var(--red); --b-d: var(--red-d); color: #fff; }
 .btn.big { font-family: var(--display); font-weight: 400; font-size: 19px; padding: 14px 20px; border-radius: 18px; width: 100%; box-shadow: 0 5px 0 var(--b-d); }
+.btn.bots { --b: var(--surface-2); --b-d: var(--shadow); font-size: 16px; }
+.btn.bots svg { --seat: var(--surface-2); width: 22px; height: 22px; color: var(--ink); }
 .btn .badge { background: #0003; border-radius: 99px; padding: 1px 8px; font-size: 13px; font-variant-numeric: tabular-nums; }
 .chip-btn { padding: 6px 12px 6px 6px; }
 .chip-btn .avatar { --size: 26px; font-size: 11px; }
@@ -186,6 +188,7 @@ p { margin: 0; }
   box-shadow: inset 0 -4px 0 #0003;
   text-shadow: 0 1px 0 #0004;
 }
+.avatar.bot svg { width: 64%; height: 64%; color: #fff; filter: drop-shadow(0 1px 0 #0004); }
 .avatar.ghost { background: transparent; border: 2px dashed var(--line); color: var(--line); box-shadow: none; font-size: 22px; }
 .avatar b {
   position: absolute;
@@ -238,6 +241,9 @@ p { margin: 0; }
 .seat-grid .avatar { --size: 58px; }
 .seat-grid .pop { animation: pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both; animation-delay: calc(var(--i) * 70ms); }
 @keyframes pop { from { transform: scale(0.3); opacity: 0; } }
+.add-bot { background: none; border: 0; padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--muted); }
+.add-bot .avatar.ghost { border-color: var(--yellow); color: var(--yellow); }
+.add-bot:hover .avatar.ghost { background: #ffc21a1a; }
 .seat-label { font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .seat-sub { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; min-height: 1em; }
 .waiting { display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--muted); font-weight: 500; }
@@ -790,6 +796,22 @@ function addPlayer(state, id, name) {
   return finish(s);
 }
 
+const BOT_NAMES = ["Robo Rita", "Sprocket", "Gizmo", "Bolt", "Chip", "Widget", "Cog"];
+
+function addBot(state, byId) {
+  if (state.status !== "lobby") fail("Bots can only join before the game starts.");
+  if (byId !== state.host) fail("Only the host can add bots.");
+  if (state.players.length >= MAX_PLAYERS) fail(`The table is full (${MAX_PLAYERS} players).`);
+  const s = clone(state);
+  const taken = new Set(s.players.map((p) => p.name));
+  const name = BOT_NAMES.find((n) => !taken.has(n)) || `Bot ${s.players.length + 1}`;
+  let n = 1;
+  while (s.players.some((p) => p.id === `bot_${n}`)) n++;
+  s.players.push({ ...newPlayer(`bot_${n}`, name), bot: true });
+  log(s, `${name} (bot) sat down.`);
+  return finish(s);
+}
+
 function removePlayer(state, byId, id) {
   if (state.status !== "lobby") fail("Players can only leave before the game starts.");
   if (byId !== id && byId !== state.host) fail("Only the host can remove other players.");
@@ -797,7 +819,8 @@ function removePlayer(state, byId, id) {
   const p = s.players.find((x) => x.id === id);
   if (!p) return state;
   s.players = s.players.filter((x) => x.id !== id);
-  if (s.host === id && s.players.length) s.host = s.players[0].id;
+  const humans = s.players.filter((x) => !x.bot);
+  if (s.host === id && humans.length) s.host = humans[0].id;
   log(s, `${p.name} left.`);
   return finish(s);
 }
@@ -929,12 +952,16 @@ function discard(state, playerId, cardId, skipTargetId) {
   s.discard.push(card);
   if (card.kind === "skip") {
     const others = s.players.filter((x) => x.id !== p.id);
-    const targetId = others.length === 1 ? others[0].id : skipTargetId;
-    const target = others.find((x) => x.id === targetId);
-    if (!target) fail("Choose who to skip.");
-    if (target.skipped) fail(`${target.name} is already being skipped. Choose someone else.`);
-    target.skipped = true;
-    log(s, `${p.name} discarded a Skip on ${target.name}.`);
+    if (others.every((x) => x.skipped)) {
+      log(s, `${p.name} discarded a Skip, but everyone is already skipped.`);
+    } else {
+      const targetId = others.length === 1 ? others[0].id : skipTargetId;
+      const target = others.find((x) => x.id === targetId);
+      if (!target) fail("Choose who to skip.");
+      if (target.skipped) fail(`${target.name} is already being skipped. Choose someone else.`);
+      target.skipped = true;
+      log(s, `${p.name} discarded a Skip on ${target.name}.`);
+    }
   } else {
     log(s, `${p.name} discarded ${cardLabel(card)}.`);
   }
@@ -984,6 +1011,8 @@ function applyAction(state, playerId, action, rng = Math.random) {
       return addPlayer(state, playerId, action.name);
     case "leave":
       return removePlayer(state, playerId, action.playerId || playerId);
+    case "addBot":
+      return addBot(state, playerId);
     case "start":
       return startGame(state, playerId, rng);
     case "draw":
@@ -1019,6 +1048,148 @@ function viewFor(state, playerId) {
   };
 }
 
+// Computer players. A bot plays one whole turn at a time through the same engine
+// actions a person uses, so it can never break a rule.
+
+// Pause before a bot moves, so people can follow what happened.
+const BOT_DELAY_MS = 1100;
+
+function botToMove(state) {
+  return state.status === "playing" && state.players[state.turn].bot === true;
+}
+
+// Every way to build one required group from `cards`, cheapest in wilds first.
+function candidates(req, cards) {
+  const wilds = cards.filter((c) => c.kind === "wild");
+  const nat = cards.filter((c) => c.kind === "n");
+  const out = [];
+  const fill = (naturals) => {
+    const take = naturals.slice(0, req.size);
+    const need = req.size - take.length;
+    if (take.length && need <= wilds.length) out.push({ cards: [...take, ...wilds.slice(0, need)], wilds: need });
+  };
+  if (req.kind === "set") {
+    for (let n = 1; n <= 12; n++) fill(nat.filter((c) => c.n === n));
+  } else if (req.kind === "color") {
+    for (const color of COLORS) fill(nat.filter((c) => c.c === color));
+  } else {
+    for (let start = 1; start + req.size - 1 <= 12; start++) {
+      const run = [];
+      for (let v = start; v < start + req.size; v++) {
+        const c = nat.find((x) => x.n === v);
+        if (c) run.push(c);
+      }
+      const need = req.size - run.length;
+      if (run.length && need <= wilds.length) out.push({ cards: [...run, ...wilds.slice(0, need)], wilds: need });
+    }
+  }
+  return out.sort((a, b) => a.wilds - b.wilds).map((g) => g.cards);
+}
+
+// Cards from `hand` that make the whole phase, or null.
+function findPhase(phase, hand) {
+  const reqs = PHASES[phase - 1];
+  if (!reqs) return null;
+  const search = (k, remaining) => {
+    if (k === reqs.length) return [];
+    for (const group of candidates(reqs[k], remaining)) {
+      const used = new Set(group.map((c) => c.id));
+      const rest = search(k + 1, remaining.filter((c) => !used.has(c.id)));
+      if (rest) return [...group, ...rest];
+    }
+    return null;
+  };
+  return search(0, hand);
+}
+
+// How much a card is worth keeping. Higher means keep; the lowest is discarded.
+function keepScore(card, hand, me, table) {
+  if (card.kind === "wild") return 100;
+  if (card.kind === "skip") return -50; // always worth throwing at someone
+  if (me.laid) return table.some((g) => extendGroup(g, card)) ? 50 : -cardPoints(card);
+  const others = hand.filter((c) => c.id !== card.id && c.kind === "n");
+  let best = 0;
+  for (const req of PHASES[me.phase - 1]) {
+    let v = 0;
+    if (req.kind === "set") v = others.filter((c) => c.n === card.n).length * 3;
+    else if (req.kind === "color") v = others.filter((c) => c.c === card.c).length;
+    else {
+      const nums = new Set(others.map((c) => c.n));
+      if (!nums.has(card.n)) for (let d = 1; d <= 3; d++) v += (nums.has(card.n - d) ? 4 - d : 0) + (nums.has(card.n + d) ? 4 - d : 0);
+    }
+    best = Math.max(best, v);
+  }
+  return best - cardPoints(card) / 100; // between equals, dump the expensive card
+}
+
+function wantsDiscard(state, me) {
+  const top = state.discard[state.discard.length - 1];
+  if (!top || top.kind === "skip") return false;
+  if (top.kind === "wild") return true;
+  if (me.laid) return state.table.some((g) => extendGroup(g, top));
+  const withTop = [...me.hand, top];
+  if (!findPhase(me.phase, me.hand) && findPhase(me.phase, withTop)) return true;
+  return keepScore(top, withTop, me, state.table) >= 3;
+}
+
+// The player most worth slowing down: furthest along, then lowest score.
+function skipTarget(state, me) {
+  const options = state.players.filter((p) => p.id !== me.id && !p.skipped);
+  options.sort((a, b) => b.phase - a.phase || Number(b.laid) - Number(a.laid) || a.score - b.score);
+  return options[0];
+}
+
+// Plays the current bot's whole turn and returns the new state.
+function botTurn(state, rng = Math.random) {
+  const id = state.players[state.turn].id;
+  const me = (s) => s.players.find((p) => p.id === id);
+  let s = state;
+
+  if (s.step === "draw") s = draw(s, id, wantsDiscard(s, me(s)) ? "discard" : "deck", rng);
+
+  if (!me(s).laid) {
+    const cards = findPhase(me(s).phase, me(s).hand);
+    if (cards) s = layDown(s, id, cards.map((c) => c.id));
+  }
+
+  // Add everything that fits to the table; running out of cards wins the hand.
+  for (let progress = true; progress && s.status === "playing" && me(s).laid; ) {
+    progress = false;
+    for (const card of me(s).hand) {
+      if (card.kind === "skip") continue;
+      const gi = s.table.findIndex((g) => extendGroup(g, card));
+      if (gi >= 0) {
+        s = hit(s, id, card.id, gi);
+        progress = true;
+        break;
+      }
+    }
+  }
+  if (s.status !== "playing") return s;
+
+  const hand = me(s).hand;
+  const ranked = hand.slice().sort((a, b) => keepScore(a, hand, me(s), s.table) - keepScore(b, hand, me(s), s.table));
+  const target = skipTarget(s, me(s));
+  // A Skip with nobody left to skip is just thrown away, so prefer a real card then.
+  const pick = ranked.find((c) => c.kind !== "skip" || target) || ranked[0];
+  return discard(s, id, pick.id, pick.kind === "skip" && target ? target.id : undefined);
+}
+
+// botTurn with a fallback: should the strategy ever hit a rule it didn't expect,
+// the bot just draws and discards so the game never stalls on its turn.
+function safeBotTurn(state, rng = Math.random) {
+  try {
+    return botTurn(state, rng);
+  } catch (e) {
+    const id = state.players[state.turn].id;
+    let s = state.step === "draw" ? draw(state, id, "deck", rng) : state;
+    const me = s.players.find((p) => p.id === id);
+    const card = me.hand.find((c) => c.kind !== "skip") || me.hand[0];
+    const target = s.players.find((p) => p.id !== id && !p.skipped);
+    return discard(s, id, card.id, target && target.id);
+  }
+}
+
 // Phase Ten table UI. Renders whatever the transport reports and sends player
 // actions back through it, so the same screen runs on the website (server
 // transport) and in the Claude artifact (shared-store transport).
@@ -1038,6 +1209,7 @@ const initials = (name) =>
     .toUpperCase();
 const reduceMotion = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+const BOT_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5v3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="2.5" r="1.6" fill="currentColor"/><rect x="4" y="6.5" width="16" height="12.5" rx="4" fill="currentColor"/><circle cx="9" cy="12.5" r="2" fill="var(--seat)"/><circle cx="15" cy="12.5" r="2" fill="var(--seat)"/><path d="M1.5 11v4M22.5 11v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
 const SKIP_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="3"/><path d="M6 18 18 6" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`;
 
 function cardHtml(card, { selected = false, attrs = "", small = false, cls = "", style = "" } = {}) {
@@ -1063,8 +1235,8 @@ function trackHtml(p) {
   return `<span class="track" role="img" aria-label="${label}">${dots}</span>`;
 }
 
-function avatarHtml(name, color, extra = "") {
-  return `<span class="avatar" style="--seat:${color}">${esc(initials(name))}${extra}</span>`;
+function avatarHtml(name, color, extra = "", bot = false) {
+  return `<span class="avatar${bot ? " bot" : ""}" style="--seat:${color}">${bot ? BOT_ICON : esc(initials(name))}${extra}</span>`;
 }
 
 // Short-lived celebration effects drawn above the page.
@@ -1286,6 +1458,7 @@ function mountApp(root, transport) {
         <label><span class="lbl">Your name</span>
           <input id="name" maxlength="20" autocomplete="nickname" value="${nameVal}" placeholder="What do your friends call you?"></label>
         <button type="button" class="btn primary big" data-do="create">Start a table</button>
+        <button type="button" class="btn big bots" data-do="solo">${BOT_ICON}Practice against 2 bots</button>
       </section>
       ${joinBlock}
       <details class="panel rules"><summary>How to play</summary>${rulesHtml()}</details>`;
@@ -1316,12 +1489,16 @@ function mountApp(root, transport) {
         <h2>At the table <span class="count">${v.players.length}/${MAX_PLAYERS}</span></h2>
         <ul class="seat-grid">${v.players
           .map(
-            (p, i) => `<li class="${ui.seen.has(p.id) ? "" : "pop"}" style="--i:${i}">${avatarHtml(p.name, SEAT_COLORS[i % SEAT_COLORS.length])}
+            (p, i) => `<li class="${ui.seen.has(p.id) ? "" : "pop"}" style="--i:${i}">${avatarHtml(p.name, SEAT_COLORS[i % SEAT_COLORS.length], "", p.bot)}
               <span class="seat-label">${esc(p.name)}</span>
-              <span class="seat-sub">${p.id === v.host ? "Host" : ""}${p.id === v.me ? (p.id === v.host ? " · you" : "You") : ""}</span>
+              <span class="seat-sub">${p.bot ? "Bot" : ""}${p.id === v.host ? "Host" : ""}${p.id === v.me ? (p.id === v.host ? " · you" : "You") : ""}</span>
               ${isHost && p.id !== v.me ? `<button type="button" class="link small" data-kick="${esc(p.id)}">Remove</button>` : ""}</li>`
           )
-          .join("")}${Array.from({ length: MAX_PLAYERS - v.players.length }, () => `<li class="empty-seat"><span class="avatar ghost">+</span></li>`).join("")}</ul>
+          .join("")}${Array.from({ length: MAX_PLAYERS - v.players.length }, (_, k) =>
+          isHost && k === 0
+            ? `<li class="empty-seat"><button type="button" class="add-bot" data-do="add-bot"><span class="avatar ghost">+</span><span class="seat-label">Add a bot</span></button></li>`
+            : `<li class="empty-seat"><span class="avatar ghost"></span></li>`
+        ).join("")}</ul>
         ${
           isHost
             ? `<button type="button" class="btn primary big" data-do="start" ${v.players.length < 2 ? "disabled" : ""}>
@@ -1371,7 +1548,7 @@ function mountApp(root, transport) {
         .map((p, i) =>
           p.id === v.me || p.skipped
             ? ""
-            : `<button type="button" class="btn chip-btn" data-skip="${esc(p.id)}">${avatarHtml(p.name, SEAT_COLORS[i % SEAT_COLORS.length])}${esc(p.name)}</button>`
+            : `<button type="button" class="btn chip-btn" data-skip="${esc(p.id)}">${avatarHtml(p.name, SEAT_COLORS[i % SEAT_COLORS.length], "", p.bot)}${esc(p.name)}</button>`
         )
         .join("")}<button type="button" class="link" data-do="cancel-skip">Cancel</button></div>`;
     }
@@ -1389,7 +1566,7 @@ function mountApp(root, transport) {
   function statusText(v, d) {
     const turnP = v.players[v.turn];
     if (v.status !== "playing") return "Hand over";
-    if (!d.myTurn) return `${esc(turnP.name)} is thinking…`;
+    if (!d.myTurn) return turnP.bot ? `${esc(turnP.name)} is calculating…` : `${esc(turnP.name)} is thinking…`;
     if (v.step === "draw") return "Your turn · draw";
     if (!d.me.laid) return `Your turn · Phase ${d.me.phase}, then discard`;
     return "Your turn · play cards, then discard";
@@ -1407,7 +1584,7 @@ function mountApp(root, transport) {
           (i === v.dealer ? `<b class="dealer" title="Dealer">D</b>` : "") +
           (p.skipped ? `<b class="skipmark" title="Skipped next turn">${SKIP_ICON}</b>` : "");
         return `<li class="seat${active ? " active" : ""}${p.id === v.me ? " me" : ""}${p.skipped ? " skipped" : ""}">
-          ${avatarHtml(p.name, SEAT_COLORS[i % SEAT_COLORS.length], badges)}
+          ${avatarHtml(p.name, SEAT_COLORS[i % SEAT_COLORS.length], badges, p.bot)}
           <div class="seat-info">
             <div class="seat-name">${esc(p.name)}${p.id === v.me ? ' <span class="you">you</span>' : ""}</div>
             <div class="seat-stats"><span class="mini-hand" title="Cards in hand">${p.handCount}</span><span>${p.score} pts</span>${p.laid ? '<span class="done-chip">Phase down</span>' : ""}</div>
@@ -1506,7 +1683,7 @@ function mountApp(root, transport) {
             const r = last.results.find((x) => x.id === p.id) || {};
             const i = seatOf(p.id);
             return `<li class="${v.winners.includes(p.id) ? "win" : ""}">
-              ${avatarHtml(p.name, SEAT_COLORS[i % SEAT_COLORS.length])}
+              ${avatarHtml(p.name, SEAT_COLORS[i % SEAT_COLORS.length], "", p.bot)}
               <div class="grow"><strong>${esc(p.name)}</strong>
                 <span class="r-sub ${r.completed ? "ok" : "miss"}">${r.completed ? `Made phase ${r.completed}` : "Missed the phase"} · +${r.points ?? 0}</span>
                 ${trackHtml({ ...p, laid: false })}</div>
@@ -1595,6 +1772,18 @@ function mountApp(root, transport) {
       }
       case "start":
         return act({ type: "start" });
+      case "add-bot":
+        return act({ type: "addBot" });
+      case "solo": {
+        const name = nameValue();
+        if (!name) return setToast("Enter your name first.");
+        return run(async () => {
+          await transport.createGame(name);
+          await transport.act({ type: "addBot" });
+          await transport.act({ type: "addBot" });
+          await transport.act({ type: "start" });
+        });
+      }
       case "next":
         return act({ type: "nextHand" });
       case "lay":
@@ -1602,7 +1791,8 @@ function mountApp(root, transport) {
       case "discard": {
         const me = v.players.find((p) => p.id === v.me);
         const card = me.hand.find((c) => c.id === ui.selected[0]);
-        if (card && card.kind === "skip" && v.players.length > 2) {
+        const canSkipSomeone = v.players.some((p) => p.id !== v.me && !p.skipped);
+        if (card && card.kind === "skip" && v.players.length > 2 && canSkipSomeone) {
           ui.skipPick = true;
           return refreshSelection();
         }
@@ -1675,16 +1865,30 @@ function createArtifactTransport() {
   let games = [];
   let current = null; // latest game state for `code`
   let unsubGame = null;
+  let botTimer = null;
+
+  // Everyone at the table offers to play a waiting bot's turn; the lease and the
+  // version check make sure only one of them actually does.
+  function scheduleBot() {
+    clearTimeout(botTimer);
+    if (!current || !botToMove(current)) return;
+    const seq = current.seq;
+    const gameCode = code;
+    botTimer = setTimeout(() => {
+      withLease(gameCode, (s) => (s && botToMove(s) && s.seq === seq ? safeBotTurn(s) : s)).catch(() => {});
+    }, BOT_DELAY_MS + Math.random() * 600);
+  }
 
   function publish() {
     if (code && current) {
       emit({ screen: "game", code, view: viewFor(current, uid) });
+      scheduleBot();
       return;
     }
     if (code) return emit({ screen: "loading", message: "Opening your game…" });
     const now = Date.now();
     const list = games
-      .filter((g) => g.state && now - g.updated < STALE_MS)
+      .filter((g) => g.state && now - g.updated < STALE_MS && g.state.players.some((p) => !p.bot))
       .filter((g) => g.state.status === "lobby" || g.state.players.some((p) => p.id === uid))
       .filter((g) => g.state.status !== "finished")
       .map((g) => ({
@@ -1699,6 +1903,7 @@ function createArtifactTransport() {
   function watchGame(next) {
     if (unsubGame) unsubGame();
     unsubGame = null;
+    clearTimeout(botTimer);
     code = next;
     current = null;
     saved.set("p10-code", code);
