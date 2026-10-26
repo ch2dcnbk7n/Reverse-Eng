@@ -100,7 +100,7 @@ function createArtifactTransport() {
 
   return {
     listsGames: true,
-    shareHint: () => "Friends open this same page and pick your game from Open games.",
+    shareHint: () => "Friends open this same page and tap Join under Open tables.",
     async init(fn) {
       emit = fn;
       emit({ screen: "loading", message: "Connecting…" });

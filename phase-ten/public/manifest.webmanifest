@@ -3,7 +3,7 @@
   "short_name": "Phase Ten",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#2b1730",
-  "theme_color": "#2b1730",
+  "background_color": "#120f33",
+  "theme_color": "#120f33",
   "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
 }
