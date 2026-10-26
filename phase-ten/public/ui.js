@@ -27,7 +27,7 @@ function cardHtml(card, { selected = false, attrs = "", small = false, cls = "",
   const label = card.kind === "n" ? `${card.c} ${card.n}` : card.kind === "wild" ? "Wild" : "Skip";
   const corner = card.kind === "wild" ? "W" : card.kind === "skip" ? "S" : card.n;
   // Small cards sit inside a group button, so they render as spans.
-  if (small) return `<span class="card small ${kind}" aria-hidden="true"><span class="pip">${face}</span></span>`;
+  if (small) return `<span class="card small ${kind}${card.n >= 10 ? " two" : ""}" aria-hidden="true"><span class="pip">${face}</span></span>`;
   return `<button type="button" class="card ${kind}${selected ? " sel" : ""} ${cls}" ${style ? `style="${style}"` : ""} ${attrs}
     aria-label="${esc(label)}" aria-pressed="${selected}">
     <span class="corner">${corner}</span><span class="pip">${face}</span>
@@ -455,12 +455,13 @@ export function mountApp(root, transport) {
         </div>
         <p class="turn-pill${d.myTurn ? " mine" : ""}" aria-live="polite">${statusText(v, d)}</p>
       </section>
-      <section class="table">${table}</section>
-      <details class="log"><summary>Game log</summary><ul>${v.log
-        .slice(-12)
-        .reverse()
-        .map((l) => `<li>${esc(l)}</li>`)
-        .join("")}</ul></details>
+      <section class="table" aria-label="Phases on the table">${table}
+        <details class="log"><summary>Game log</summary><ul>${v.log
+          .slice(-12)
+          .reverse()
+          .map((l) => `<li>${esc(l)}</li>`)
+          .join("")}</ul></details>
+      </section>
       <section class="dock${d.myTurn ? " mine" : ""}">
         <div class="dock-head">
           <span class="phase-badge" aria-hidden="true">${Math.min(d.me.phase, 10)}</span>
