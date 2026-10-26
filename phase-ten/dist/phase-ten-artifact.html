@@ -1,0 +1,1292 @@
+<title>Phase Ten</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Figtree:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: one phone-width column on a plum card-table felt; ivory cards carry the color. */
+:root {
+  --felt: #2b1730;
+  --felt-2: #3a2040;
+  --felt-3: #4a2b52;
+  --line: #5e3d66;
+  --ink: #f6eef2;
+  --muted: #c3aec5;
+  --card: #fbf6ec;
+  --card-ink: #22121f;
+  --red: #d8343c;
+  --blue: #2a63d4;
+  --green: #1f8f52;
+  --yellow: #e0a400;
+  --gold: #f2c14e;
+  --ok: #7fd7a0;
+  --warn: #ff9f7a;
+  --display: "Bowlby One", "Arial Black", Impact, sans-serif;
+  --body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body {
+  margin: 0;
+  background: radial-gradient(120% 80% at 50% 0%, var(--felt-2), var(--felt) 70%) fixed, var(--felt);
+  color: var(--ink);
+  font: 15px/1.45 var(--body);
+}
+button { font: inherit; color: inherit; }
+input {
+  font: inherit;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--felt);
+  color: var(--ink);
+}
+input:focus-visible, button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+
+.wrap {
+  max-width: 760px;
+  margin: 0 auto;
+  padding-block: 16px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.wrap.busy { cursor: progress; }
+
+h1, h2 { font-family: var(--display); font-weight: 400; margin: 0; text-wrap: balance; }
+h2 { font-size: 18px; letter-spacing: 0.02em; }
+.small-h { font-size: 28px; margin-bottom: 8px; }
+p { margin: 0; }
+.muted { color: var(--muted); }
+.lbl { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 4px; }
+.center-msg { text-align: center; padding: 60px 0; }
+
+.hero { padding: 18px 0 4px; }
+.hero h1 { font-size: clamp(44px, 12vw, 76px); line-height: 0.95; color: var(--gold); text-shadow: 0 3px 0 #0006; }
+.hero p { margin-top: 10px; color: var(--muted); max-width: 46ch; }
+
+.panel {
+  background: var(--felt-2);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.row { display: flex; gap: 10px; align-items: flex-end; }
+.grow { flex: 1; min-width: 0; }
+
+.btn {
+  border: 1px solid var(--line);
+  background: var(--felt-3);
+  border-radius: 999px;
+  padding: 10px 18px;
+  cursor: pointer;
+  font-weight: 700;
+}
+.btn:hover:not(:disabled) { border-color: var(--gold); }
+.btn.primary { background: var(--gold); color: var(--card-ink); border-color: var(--gold); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.link { background: none; border: 0; color: var(--muted); text-decoration: underline; cursor: pointer; padding: 4px; align-self: flex-start; }
+.chip { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+.chip.on { background: var(--ink); color: var(--felt); border-color: var(--ink); }
+
+.games, .players-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.games li, .players-list li {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 12px; background: var(--felt);
+}
+.games li div { display: flex; flex-direction: column; min-width: 0; }
+.tag { display: inline-block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; padding: 2px 6px; border-radius: 6px; background: var(--felt-3); color: var(--muted); }
+.tag.on { background: var(--gold); color: var(--card-ink); }
+.tag.ok { background: #1f8f5233; color: var(--ok); }
+.tag.warn { background: #ff9f7a26; color: var(--warn); }
+
+.lobby { align-items: center; text-align: center; }
+.code { font-family: var(--display); font-size: 48px; letter-spacing: 0.18em; color: var(--gold); line-height: 1; }
+
+.rules summary, .log summary { cursor: pointer; font-weight: 700; }
+.phase-list { margin: 0; padding-left: 22px; columns: 2 220px; }
+.rules p { color: var(--muted); max-width: 65ch; }
+
+/* ---------- game ---------- */
+.topbar { display: flex; justify-content: space-between; align-items: center; }
+.players { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.pl { background: var(--felt-2); border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; }
+.pl.active { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
+.pl-top { display: flex; justify-content: space-between; gap: 8px; }
+.pl-top strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.ph { font-family: var(--display); color: var(--gold); }
+.pl-meta { display: flex; gap: 10px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tags { display: flex; flex-wrap: wrap; gap: 4px; min-height: 0; }
+
+.center { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 6px 0; }
+.piles { display: flex; gap: 18px; }
+.status { text-align: center; color: var(--muted); }
+.status.mine { color: var(--gold); font-weight: 700; }
+
+.card, .pile {
+  --w: 62px;
+  width: var(--w);
+  aspect-ratio: 5 / 7;
+  max-width: 100%;
+  border-radius: 9px;
+  border: 0;
+  background: var(--card);
+  color: var(--card-ink);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px;
+  box-shadow: 0 2px 0 #0005, 0 6px 14px #0004;
+  cursor: pointer;
+  transition: transform 0.12s ease;
+  position: relative;
+  flex: none;
+}
+.card .face { font-family: var(--display); font-size: 26px; line-height: 1; }
+.card .sub, .pile .sub { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.8; }
+.card.c-red { color: var(--red); box-shadow: inset 0 0 0 3px var(--red), 0 2px 0 #0005, 0 6px 14px #0004; }
+.card.c-blue { color: var(--blue); box-shadow: inset 0 0 0 3px var(--blue), 0 2px 0 #0005, 0 6px 14px #0004; }
+.card.c-green { color: var(--green); box-shadow: inset 0 0 0 3px var(--green), 0 2px 0 #0005, 0 6px 14px #0004; }
+.card.c-yellow { color: #a87a00; box-shadow: inset 0 0 0 3px var(--yellow), 0 2px 0 #0005, 0 6px 14px #0004; }
+.card.wild {
+  background: conic-gradient(from 45deg, var(--red), var(--yellow), var(--green), var(--blue), var(--red));
+  color: #fff;
+  text-shadow: 0 1px 2px #000a;
+}
+.card.skip { background: var(--card-ink); color: var(--card); }
+.card.sel { transform: translateY(-10px); outline: 3px solid var(--gold); outline-offset: 2px; }
+.card:disabled { cursor: default; }
+.card.small { --w: 34px; border-radius: 5px; padding: 2px; cursor: inherit; box-shadow: none; }
+.card.small .face { font-size: 15px; }
+.card.small .sub { display: none; }
+.card.small.c-red { box-shadow: inset 0 0 0 2px var(--red); }
+.card.small.c-blue { box-shadow: inset 0 0 0 2px var(--blue); }
+.card.small.c-green { box-shadow: inset 0 0 0 2px var(--green); }
+.card.small.c-yellow { box-shadow: inset 0 0 0 2px var(--yellow); }
+
+.pile.deck {
+  --w: 72px;
+  background: repeating-linear-gradient(135deg, var(--felt-3) 0 8px, var(--felt-2) 8px 16px);
+  color: var(--gold);
+  border: 3px solid var(--card);
+}
+.pile.deck .face { font-family: var(--display); font-size: 17px; letter-spacing: 0.04em; }
+.piles > .card { --w: 72px; }
+.pile:disabled, .piles > .card:disabled { cursor: default; }
+.pile:not(:disabled):hover, .piles > .card:not(:disabled):hover { transform: translateY(-3px); }
+.pile.empty { --w: 72px; background: transparent; border: 2px dashed var(--line); color: var(--muted); box-shadow: none; font-size: 12px; }
+
+.table { display: flex; flex-direction: column; gap: 12px; }
+.table .empty { text-align: center; padding: 8px; }
+.groups { display: flex; flex-wrap: wrap; gap: 8px; }
+.group {
+  background: var(--felt-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+  text-align: left;
+}
+.group:disabled { cursor: default; opacity: 1; }
+.group.target { cursor: pointer; border-style: dashed; border-color: var(--gold); }
+.group.target:hover { background: var(--felt-3); }
+.g-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.g-cards { display: flex; flex-wrap: wrap; gap: 3px; }
+
+.me-area { background: #1c0f20cc; border: 1px solid var(--line); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.me-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+.goal { font-weight: 700; }
+.sort { display: flex; gap: 6px; }
+.hand { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 10px; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; min-height: 44px; }
+.pick { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+.log ul { margin: 8px 0 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: #0009;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  z-index: 20;
+}
+.sheet { background: var(--felt-2); border: 1px solid var(--gold); border-radius: 18px; padding: 20px; width: min(520px, 100%); max-height: 100%; overflow: auto; display: flex; flex-direction: column; gap: 12px; }
+.sheet h2 { font-size: 26px; color: var(--gold); }
+.sheet table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 14px; }
+.sheet th, .sheet td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+.sheet th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+.sheet tr.win td { color: var(--gold); font-weight: 700; }
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  background: var(--card);
+  color: var(--card-ink);
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-weight: 600;
+  box-shadow: 0 8px 24px #0007;
+  max-width: calc(100% - 32px);
+  z-index: 30;
+}
+
+@media (max-width: 420px) {
+  .card { --w: 52px; }
+  .card .face { font-size: 22px; }
+  .hand { gap: 6px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card, .pile { transition: none; }
+}
+
+</style>
+<div id="app"></div>
+<script>
+(() => {
+// Phase Ten rules engine. Pure functions over a plain JSON game state, shared by
+// the browser client, the Netlify function and the artifact build. Every action
+// returns a new state or throws a GameError whose message is safe to show players.
+
+const COLORS = ["red", "blue", "green", "yellow"];
+const MAX_PLAYERS = 6;
+const HAND_SIZE = 10;
+
+// Each phase is a list of groups the player must lay down together.
+const PHASES = [
+  [{ kind: "set", size: 3 }, { kind: "set", size: 3 }],
+  [{ kind: "set", size: 3 }, { kind: "run", size: 4 }],
+  [{ kind: "set", size: 4 }, { kind: "run", size: 4 }],
+  [{ kind: "run", size: 7 }],
+  [{ kind: "run", size: 8 }],
+  [{ kind: "run", size: 9 }],
+  [{ kind: "set", size: 4 }, { kind: "set", size: 4 }],
+  [{ kind: "color", size: 7 }],
+  [{ kind: "set", size: 5 }, { kind: "set", size: 2 }],
+  [{ kind: "set", size: 5 }, { kind: "set", size: 3 }],
+];
+
+const GROUP_NAMES = { set: "set", run: "run", color: "cards of one color" };
+
+function describePhase(phase) {
+  const groups = PHASES[phase - 1];
+  if (!groups) return "All phases complete";
+  return groups
+    .map((g) => (g.kind === "color" ? `${g.size} cards of one color` : `${g.kind === "set" ? "Set" : "Run"} of ${g.size}`))
+    .join(" + ");
+}
+
+class GameError extends Error {}
+const fail = (msg) => {
+  throw new GameError(msg);
+};
+
+// ---------- cards ----------
+
+function buildDeck() {
+  const deck = [];
+  let id = 0;
+  for (const c of COLORS) {
+    for (let copy = 0; copy < 2; copy++) {
+      for (let n = 1; n <= 12; n++) deck.push({ id: id++, kind: "n", n, c });
+    }
+  }
+  for (let i = 0; i < 8; i++) deck.push({ id: id++, kind: "wild" });
+  for (let i = 0; i < 4; i++) deck.push({ id: id++, kind: "skip" });
+  return deck;
+}
+
+function shuffle(cards, rng = Math.random) {
+  const a = cards.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function cardPoints(card) {
+  if (card.kind === "wild") return 25;
+  if (card.kind === "skip") return 15;
+  return card.n <= 9 ? 5 : 10;
+}
+
+function cardLabel(card) {
+  if (card.kind === "wild") return "Wild";
+  if (card.kind === "skip") return "Skip";
+  return `${card.c} ${card.n}`;
+}
+
+// ---------- group validation ----------
+
+// Returns a table group for `cards` laid as `kind` with at least `size` cards,
+// or null when the cards don't form one. Every group needs one natural card so
+// its number, color or position is fixed.
+function makeGroup(kind, cards, size = 1) {
+  if (cards.length < size || cards.some((c) => c.kind === "skip")) return null;
+  const naturals = cards.filter((c) => c.kind === "n");
+  if (naturals.length === 0) return null;
+
+  if (kind === "set") {
+    const n = naturals[0].n;
+    if (naturals.some((c) => c.n !== n)) return null;
+    return { kind, n, cards: cards.slice() };
+  }
+
+  if (kind === "color") {
+    const c = naturals[0].c;
+    if (naturals.some((x) => x.c !== c)) return null;
+    return { kind, c, cards: cards.slice() };
+  }
+
+  if (kind === "run") {
+    if (cards.length > 12) return null;
+    const nums = naturals.map((c) => c.n).sort((a, b) => a - b);
+    for (let i = 1; i < nums.length; i++) if (nums[i] === nums[i - 1]) return null;
+    const lo = nums[0];
+    const hi = nums[nums.length - 1];
+    if (hi - lo + 1 > cards.length) return null; // not enough wilds to fill the gaps
+    // Spare wilds extend the top end first, then the bottom once 12 is reached.
+    let end = lo + cards.length - 1;
+    let start = lo;
+    if (end > 12) {
+      start -= end - 12;
+      end = 12;
+    }
+    const wilds = cards.filter((c) => c.kind === "wild");
+    const ordered = [];
+    for (let v = start; v <= end; v++) ordered.push(naturals.find((c) => c.n === v) || wilds.pop());
+    return { kind, start, end, cards: ordered };
+  }
+  return null;
+}
+
+// Finds a way to split `cards` into the groups a phase requires, or null.
+function matchPhase(phase, cards) {
+  const reqs = PHASES[phase - 1];
+  if (!reqs) return null;
+  const total = reqs.reduce((s, r) => s + r.size, 0);
+  if (cards.length !== total) return null;
+
+  const buckets = reqs.map(() => []);
+  const place = (i) => {
+    if (i === cards.length) {
+      const groups = reqs.map((r, k) => makeGroup(r.kind, buckets[k], r.size));
+      return groups.every(Boolean) ? groups : null;
+    }
+    for (let k = 0; k < reqs.length; k++) {
+      if (buckets[k].length >= reqs[k].size) continue;
+      buckets[k].push(cards[i]);
+      const found = place(i + 1);
+      if (found) return found;
+      buckets[k].pop();
+    }
+    return null;
+  };
+  return place(0);
+}
+
+// Adds one card to a group already on the table. Returns the updated group or null.
+function extendGroup(group, card) {
+  if (card.kind === "skip") return null;
+  const wild = card.kind === "wild";
+  if (group.kind === "set") {
+    return wild || card.n === group.n ? { ...group, cards: [...group.cards, card] } : null;
+  }
+  if (group.kind === "color") {
+    return wild || card.c === group.c ? { ...group, cards: [...group.cards, card] } : null;
+  }
+  if (group.kind === "run") {
+    if ((wild && group.end < 12) || card.n === group.end + 1) {
+      return { ...group, end: group.end + 1, cards: [...group.cards, card] };
+    }
+    if ((wild && group.start > 1) || card.n === group.start - 1) {
+      return { ...group, start: group.start - 1, cards: [card, ...group.cards] };
+    }
+  }
+  return null;
+}
+
+// ---------- game flow ----------
+
+function createGame(hostId, hostName) {
+  return {
+    v: 1,
+    seq: 0,
+    status: "lobby",
+    host: hostId,
+    players: [newPlayer(hostId, hostName)],
+    dealer: 0,
+    turn: 0,
+    step: "draw",
+    handNo: 0,
+    deck: [],
+    discard: [],
+    table: [],
+    lastHand: null,
+    winners: [],
+    log: [],
+  };
+}
+
+function newPlayer(id, name) {
+  const clean = String(name || "").trim().slice(0, 20);
+  if (!clean) fail("Enter a name to join.");
+  return { id, name: clean, phase: 1, score: 0, hand: [], laid: false, skipped: false };
+}
+
+const clone = (s) => JSON.parse(JSON.stringify(s));
+
+function log(s, text) {
+  s.log.push(text);
+  if (s.log.length > 30) s.log.splice(0, s.log.length - 30);
+}
+
+function finish(s) {
+  s.seq += 1;
+  return s;
+}
+
+function addPlayer(state, id, name) {
+  if (state.players.some((p) => p.id === id)) return state;
+  if (state.status !== "lobby") fail("This game has already started.");
+  if (state.players.length >= MAX_PLAYERS) fail(`This game is full (${MAX_PLAYERS} players).`);
+  const s = clone(state);
+  const p = newPlayer(id, name);
+  s.players.push(p);
+  log(s, `${p.name} joined.`);
+  return finish(s);
+}
+
+function removePlayer(state, byId, id) {
+  if (state.status !== "lobby") fail("Players can only leave before the game starts.");
+  if (byId !== id && byId !== state.host) fail("Only the host can remove other players.");
+  const s = clone(state);
+  const p = s.players.find((x) => x.id === id);
+  if (!p) return state;
+  s.players = s.players.filter((x) => x.id !== id);
+  if (s.host === id && s.players.length) s.host = s.players[0].id;
+  log(s, `${p.name} left.`);
+  return finish(s);
+}
+
+function startGame(state, byId, rng = Math.random) {
+  if (state.status !== "lobby") fail("The game has already started.");
+  if (byId !== state.host) fail("Only the host can start the game.");
+  if (state.players.length < 2) fail("You need at least 2 players to start.");
+  const s = clone(state);
+  s.status = "playing";
+  s.dealer = Math.floor(rng() * s.players.length);
+  deal(s, rng);
+  return finish(s);
+}
+
+function deal(s, rng) {
+  const deck = shuffle(buildDeck(), rng);
+  s.handNo += 1;
+  for (const p of s.players) {
+    p.hand = deck.splice(0, HAND_SIZE);
+    p.laid = false;
+    p.skipped = false;
+  }
+  s.discard = [deck.pop()];
+  s.deck = deck;
+  s.table = [];
+  s.step = "draw";
+  log(s, `Hand ${s.handNo}: ${s.players[s.dealer].name} dealt.`);
+  // A Skip turned up as the first discard skips the first player.
+  if (s.discard[0].kind === "skip") s.players[(s.dealer + 1) % s.players.length].skipped = true;
+  s.turn = s.dealer;
+  advanceTurn(s);
+}
+
+function advanceTurn(s) {
+  const n = s.players.length;
+  let next = (s.turn + 1) % n;
+  // Bounded loop: each pass clears a skip, so at most n steps.
+  for (let i = 0; i < n && s.players[next].skipped; i++) {
+    s.players[next].skipped = false;
+    log(s, `${s.players[next].name} is skipped.`);
+    next = (next + 1) % n;
+  }
+  s.turn = next;
+  s.step = "draw";
+}
+
+function current(state, playerId, step) {
+  if (state.status !== "playing") fail("No hand is in progress.");
+  const idx = state.players.findIndex((p) => p.id === playerId);
+  if (idx < 0) fail("You're not in this game.");
+  if (idx !== state.turn) fail(`It's ${state.players[state.turn].name}'s turn.`);
+  if (step && state.step !== step) {
+    fail(step === "draw" ? "You've already drawn this turn." : "Draw a card first.");
+  }
+  return idx;
+}
+
+function draw(state, playerId, source, rng = Math.random) {
+  const idx = current(state, playerId, "draw");
+  const s = clone(state);
+  const p = s.players[idx];
+  if (source === "discard") {
+    const top = s.discard[s.discard.length - 1];
+    if (!top) fail("The discard pile is empty.");
+    if (top.kind === "skip") fail("You can't pick up a Skip.");
+    p.hand.push(s.discard.pop());
+    log(s, `${p.name} took ${cardLabel(top)} from the discard pile.`);
+  } else {
+    if (s.deck.length === 0) {
+      // Reshuffle everything but the top discard into a new draw pile.
+      const top = s.discard.pop();
+      s.deck = shuffle(s.discard, rng);
+      s.discard = top ? [top] : [];
+      if (s.deck.length) log(s, "The discard pile was reshuffled into the deck.");
+    }
+    if (s.deck.length === 0) fail("There are no cards left to draw. Take the discard instead.");
+    p.hand.push(s.deck.pop());
+    log(s, `${p.name} drew from the deck.`);
+  }
+  s.step = "play";
+  return finish(s);
+}
+
+function takeFromHand(p, ids) {
+  const cards = ids.map((id) => p.hand.find((c) => c.id === id));
+  if (cards.some((c) => !c) || new Set(ids).size !== ids.length) fail("Those cards aren't in your hand.");
+  p.hand = p.hand.filter((c) => !ids.includes(c.id));
+  return cards;
+}
+
+function layDown(state, playerId, cardIds) {
+  const idx = current(state, playerId, "play");
+  const s = clone(state);
+  const p = s.players[idx];
+  if (p.laid) fail("You've already laid down your phase this hand.");
+  const cards = takeFromHand(p, cardIds);
+  const groups = matchPhase(p.phase, cards);
+  if (!groups) fail(`Those cards don't make Phase ${p.phase}: ${describePhase(p.phase)}.`);
+  for (const g of groups) s.table.push({ ...g, owner: p.id });
+  p.laid = true;
+  log(s, `${p.name} completed Phase ${p.phase}!`);
+  if (p.hand.length === 0) endHand(s, idx);
+  return finish(s);
+}
+
+function hit(state, playerId, cardId, groupIndex) {
+  const idx = current(state, playerId, "play");
+  const s = clone(state);
+  const p = s.players[idx];
+  if (!p.laid) fail("Lay down your own phase before adding to groups on the table.");
+  const group = s.table[groupIndex];
+  if (!group) fail("That group isn't on the table.");
+  const [card] = takeFromHand(p, [cardId]);
+  const next = extendGroup(group, card);
+  if (!next) fail(`${cardLabel(card)} doesn't fit that ${GROUP_NAMES[group.kind]}.`);
+  s.table[groupIndex] = next;
+  const owner = s.players.find((x) => x.id === group.owner);
+  log(s, `${p.name} played ${cardLabel(card)} on ${owner ? owner.name : "a"}'s ${GROUP_NAMES[group.kind]}.`);
+  if (p.hand.length === 0) endHand(s, idx);
+  return finish(s);
+}
+
+function discard(state, playerId, cardId, skipTargetId) {
+  const idx = current(state, playerId, "play");
+  const s = clone(state);
+  const p = s.players[idx];
+  const [card] = takeFromHand(p, [cardId]);
+  s.discard.push(card);
+  if (card.kind === "skip") {
+    const others = s.players.filter((x) => x.id !== p.id);
+    const targetId = others.length === 1 ? others[0].id : skipTargetId;
+    const target = others.find((x) => x.id === targetId);
+    if (!target) fail("Choose who to skip.");
+    if (target.skipped) fail(`${target.name} is already being skipped. Choose someone else.`);
+    target.skipped = true;
+    log(s, `${p.name} discarded a Skip on ${target.name}.`);
+  } else {
+    log(s, `${p.name} discarded ${cardLabel(card)}.`);
+  }
+  if (p.hand.length === 0) endHand(s, idx);
+  else advanceTurn(s);
+  return finish(s);
+}
+
+function endHand(s, winnerIdx) {
+  const winner = s.players[winnerIdx];
+  const results = s.players.map((p) => {
+    const points = p.hand.reduce((sum, c) => sum + cardPoints(c), 0);
+    return { id: p.id, completed: p.laid ? p.phase : null, points };
+  });
+  for (const p of s.players) {
+    p.score += p.hand.reduce((sum, c) => sum + cardPoints(c), 0);
+    if (p.laid) p.phase += 1;
+  }
+  s.lastHand = { handNo: s.handNo, wentOut: winner.id, results };
+  log(s, `${winner.name} went out and ended hand ${s.handNo}.`);
+
+  const done = s.players.filter((p) => p.phase > PHASES.length);
+  if (done.length) {
+    const best = Math.min(...done.map((p) => p.score));
+    s.winners = done.filter((p) => p.score === best).map((p) => p.id);
+    s.status = "finished";
+    log(s, `${s.winners.map((id) => s.players.find((p) => p.id === id).name).join(" and ")} won the game!`);
+  } else {
+    s.status = "between";
+  }
+}
+
+function nextHand(state, playerId, rng = Math.random) {
+  if (state.status !== "between") fail("The current hand isn't over yet.");
+  if (!state.players.some((p) => p.id === playerId)) fail("You're not in this game.");
+  const s = clone(state);
+  s.status = "playing";
+  s.dealer = (s.dealer + 1) % s.players.length;
+  deal(s, rng);
+  return finish(s);
+}
+
+// Applies an action object, the shape every client sends.
+function applyAction(state, playerId, action, rng = Math.random) {
+  switch (action && action.type) {
+    case "join":
+      return addPlayer(state, playerId, action.name);
+    case "leave":
+      return removePlayer(state, playerId, action.playerId || playerId);
+    case "start":
+      return startGame(state, playerId, rng);
+    case "draw":
+      return draw(state, playerId, action.source, rng);
+    case "layDown":
+      return layDown(state, playerId, action.cardIds || []);
+    case "hit":
+      return hit(state, playerId, action.cardId, action.groupIndex);
+    case "discard":
+      return discard(state, playerId, action.cardId, action.skipTarget);
+    case "nextHand":
+      return nextHand(state, playerId, rng);
+    default:
+      fail("Unknown action.");
+  }
+}
+
+// What one player is allowed to see: their own hand, everyone's hand size,
+// the top discard, and the deck size.
+function viewFor(state, playerId) {
+  return {
+    ...state,
+    deck: undefined,
+    deckCount: state.deck.length,
+    discard: state.discard.slice(-1),
+    discardCount: state.discard.length,
+    players: state.players.map((p) => ({
+      ...p,
+      hand: p.id === playerId ? p.hand : undefined,
+      handCount: p.hand.length,
+    })),
+    me: playerId,
+  };
+}
+
+// Phase Ten table UI. Renders whatever the transport reports and sends player
+// actions back through it, so the same screen runs on the website (server
+// transport) and in the Claude artifact (shared-store transport).
+
+const esc = (v) =>
+  String(v ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]);
+
+const COLOR_ORDER = { red: 0, blue: 1, green: 2, yellow: 3 };
+const phaseSize = (phase) => (PHASES[phase - 1] || []).reduce((t, g) => t + g.size, 0);
+
+function cardHtml(card, { selected = false, attrs = "", small = false } = {}) {
+  const cls = card.kind === "n" ? `c-${card.c}` : card.kind;
+  const face = card.kind === "wild" ? "W" : card.kind === "skip" ? "S" : card.n;
+  const sub = card.kind === "wild" ? "Wild" : card.kind === "skip" ? "Skip" : card.c;
+  // Small cards sit inside a group button, so they render as spans.
+  const tag = small ? "span" : "button";
+  return `<${tag} ${small ? "" : 'type="button" '}class="card ${cls}${selected ? " sel" : ""}${small ? " small" : ""}" ${attrs}
+    aria-label="${esc(card.kind === "n" ? `${card.c} ${card.n}` : sub)}${selected ? ", selected" : ""}">
+    <span class="face">${esc(face)}</span><span class="sub">${esc(sub)}</span></${tag}>`;
+}
+
+function mountApp(root, transport) {
+  const ui = { snap: { screen: "loading" }, selected: [], sort: "number", toast: "", busy: false, skipPick: false };
+  try {
+    ui.sort = localStorage.getItem("p10-sort") || "number";
+  } catch {}
+
+  function setToast(msg) {
+    ui.toast = msg;
+    render();
+    clearTimeout(setToast.t);
+    if (msg) setToast.t = setTimeout(() => setToast(""), 4000);
+  }
+
+  async function run(fn) {
+    if (ui.busy) return;
+    ui.busy = true;
+    render();
+    try {
+      await fn();
+    } catch (e) {
+      setToast(e && e.message ? e.message : "Something went wrong. Try again.");
+    } finally {
+      ui.busy = false;
+      render();
+    }
+  }
+
+  // On success, clear only the selection the action used: the update can render
+  // before this resolves, and the player may already have tapped new cards.
+  const act = (action) => {
+    const used = ui.selected.slice();
+    return run(async () => {
+      await transport.act(action);
+      ui.selected = ui.selected.filter((id) => !used.includes(id));
+      ui.skipPick = false;
+    });
+  };
+
+  transport.init((snap) => {
+    ui.snap = snap;
+    // Drop selections for cards that left the hand.
+    const me = snap.view && snap.view.players.find((p) => p.id === snap.view.me);
+    if (me && me.hand) ui.selected = ui.selected.filter((id) => me.hand.some((c) => c.id === id));
+    render();
+  });
+
+  // ---------- screens ----------
+
+  function homeHtml() {
+    const s = ui.snap;
+    const nameVal = esc(ui.name ?? s.defaultName ?? "");
+    const games = s.games || [];
+    const joinBlock = transport.listsGames
+      ? `<section class="panel">
+          <h2>Open games</h2>
+          ${
+            games.length
+              ? `<ul class="games">${games
+                  .map(
+                    (g) => `<li><div><strong>${esc(g.hostName)}'s table</strong>
+                      <span class="muted">${g.players}/${MAX_PLAYERS} players · code ${esc(g.code)}</span></div>
+                      <button type="button" class="btn" data-join="${esc(g.code)}"${g.mine ? " data-mine" : ""}>${g.mine ? "Rejoin" : "Join"}</button></li>`
+                  )
+                  .join("")}</ul>`
+              : `<p class="muted">No one is waiting yet. Create a game and tell your friends to open this page.</p>`
+          }
+        </section>`
+      : `<section class="panel">
+          <h2>Join a friend</h2>
+          <form id="join-form" class="row">
+            <label class="grow"><span class="lbl">Room code</span>
+              <input id="join-code" autocomplete="off" maxlength="5" placeholder="ABCDE" value="${esc(ui.code ?? s.prefillCode ?? "")}"></label>
+            <button class="btn" type="submit">Join</button>
+          </form>
+        </section>`;
+    return `<header class="hero">
+        <h1>Phase Ten</h1>
+        <p>Ten phases. 2 to ${MAX_PLAYERS} players. First to finish Phase 10 with the lowest score wins.</p>
+      </header>
+      <section class="panel">
+        <label><span class="lbl">Your name</span>
+          <input id="name" maxlength="20" autocomplete="nickname" value="${nameVal}" placeholder="What should friends call you?"></label>
+        <button type="button" class="btn primary" data-do="create">Create a game</button>
+      </section>
+      ${joinBlock}
+      <details class="panel rules"><summary>How to play</summary>${rulesHtml()}</details>`;
+  }
+
+  function rulesHtml() {
+    return `<ol class="phase-list">${PHASES.map((_, i) => `<li>${esc(describePhase(i + 1))}</li>`).join("")}</ol>
+      <p>On your turn, draw from the deck or the discard pile. If you can, lay down your whole phase at once.
+      After your phase is down you can add cards to any group on the table. End your turn by discarding.
+      A Wild stands in for any card. A Skip makes a player of your choice miss their next turn.</p>
+      <p>The hand ends when someone runs out of cards. Everyone who laid down their phase moves to the next one.
+      Cards left in hand score: 1–9 are 5 points, 10–12 are 10, Skip 15, Wild 25.</p>`;
+  }
+
+  function lobbyHtml(v) {
+    const isHost = v.host === v.me;
+    return `<section class="panel lobby">
+        <p class="lbl">Room code</p>
+        <p class="code">${esc(ui.snap.code)}</p>
+        ${transport.shareHint ? `<p class="muted">${esc(transport.shareHint(ui.snap.code))}</p>` : ""}
+        ${transport.shareUrl ? `<button type="button" class="btn" data-do="copy">Copy invite link</button>` : ""}
+      </section>
+      <section class="panel">
+        <h2>Players (${v.players.length}/${MAX_PLAYERS})</h2>
+        <ul class="players-list">${v.players
+          .map(
+            (p) => `<li><span>${esc(p.name)}${p.id === v.host ? ' <span class="tag">Host</span>' : ""}${p.id === v.me ? ' <span class="tag">You</span>' : ""}</span>
+              ${isHost && p.id !== v.me ? `<button type="button" class="link" data-kick="${esc(p.id)}">Remove</button>` : ""}</li>`
+          )
+          .join("")}</ul>
+        ${
+          isHost
+            ? `<button type="button" class="btn primary" data-do="start" ${v.players.length < 2 ? "disabled" : ""}>
+                ${v.players.length < 2 ? "Waiting for at least one more player" : `Start with ${v.players.length} players`}</button>`
+            : `<p class="muted">Waiting for ${esc(v.players.find((p) => p.id === v.host)?.name || "the host")} to start.</p>`
+        }
+        <button type="button" class="link" data-do="leave">Leave game</button>
+      </section>`;
+  }
+
+  function sortedHand(hand) {
+    const h = hand.slice();
+    const rank = (c) => (c.kind === "wild" ? 100 : c.kind === "skip" ? 200 : 0);
+    if (ui.sort === "color") {
+      h.sort((a, b) => rank(a) - rank(b) || COLOR_ORDER[a.c] - COLOR_ORDER[b.c] || a.n - b.n);
+    } else {
+      h.sort((a, b) => rank(a) - rank(b) || a.n - b.n || COLOR_ORDER[a.c] - COLOR_ORDER[b.c]);
+    }
+    return h;
+  }
+
+  function gameHtml(v) {
+    const me = v.players.find((p) => p.id === v.me);
+    const turnP = v.players[v.turn];
+    const myTurn = v.status === "playing" && turnP.id === v.me;
+    const sel = ui.selected;
+    const top = v.discard[0];
+    const canDraw = myTurn && v.step === "draw" && !ui.busy;
+    const need = phaseSize(me.phase);
+    const selCards = sel.map((id) => me.hand.find((c) => c.id === id)).filter(Boolean);
+    const canLay = myTurn && v.step === "play" && !me.laid && sel.length === need;
+    const canDiscard = myTurn && v.step === "play" && sel.length === 1;
+    const canHit = myTurn && v.step === "play" && me.laid && sel.length === 1;
+
+    let status;
+    if (v.status !== "playing") status = "Hand over";
+    else if (!myTurn) status = `${esc(turnP.name)} is playing…`;
+    else if (v.step === "draw") status = "Your turn. Draw from the deck or the discard pile.";
+    else if (!me.laid) status = `Lay down Phase ${me.phase} if you can, then discard one card.`;
+    else status = "Add cards to groups on the table, then discard one card.";
+
+    const players = v.players
+      .map((p, i) => {
+        const tags = [
+          i === v.turn && v.status === "playing" ? '<span class="tag on">Turn</span>' : "",
+          p.skipped ? '<span class="tag warn">Skipped next</span>' : "",
+          p.laid ? '<span class="tag ok">Phase down</span>' : "",
+          i === v.dealer ? '<span class="tag">Dealer</span>' : "",
+        ].join("");
+        return `<li class="pl${i === v.turn ? " active" : ""}${p.id === v.me ? " me" : ""}">
+          <div class="pl-top"><strong>${esc(p.name)}${p.id === v.me ? " (you)" : ""}</strong><span class="ph">P${Math.min(p.phase, 10)}</span></div>
+          <div class="pl-meta"><span>${p.score} pts</span><span>${p.handCount} cards</span></div>
+          <div class="tags">${tags}</div></li>`;
+      })
+      .join("");
+
+    const owners = v.players.filter((p) => v.table.some((g) => g.owner === p.id));
+    const table = owners.length
+      ? owners
+          .map(
+            (p) => `<div class="owner"><p class="lbl">${esc(p.name)} · Phase ${p.phase}</p><div class="groups">${v.table
+              .map((g, gi) => (g.owner !== p.id ? "" : groupHtml(g, gi, canHit)))
+              .join("")}</div></div>`
+          )
+          .join("")
+      : `<p class="muted empty">No phases on the table yet.</p>`;
+
+    let actions = "";
+    if (myTurn && v.step === "play") {
+      const skipSel = selCards.length === 1 && selCards[0].kind === "skip";
+      const targets = v.players.filter((p) => p.id !== v.me && !p.skipped);
+      if (ui.skipPick && skipSel && v.players.length > 2) {
+        actions = `<div class="pick"><span>Skip who?</span>${targets
+          .map((p) => `<button type="button" class="btn" data-skip="${esc(p.id)}">${esc(p.name)}</button>`)
+          .join("")}<button type="button" class="link" data-do="cancel-skip">Cancel</button></div>`;
+      } else {
+        actions = `
+          ${!me.laid ? `<button type="button" class="btn primary" data-do="lay" ${canLay ? "" : "disabled"}>Lay down Phase ${me.phase} (${sel.length}/${need})</button>` : ""}
+          <button type="button" class="btn" data-do="discard" ${canDiscard ? "" : "disabled"}>${skipSel ? "Discard Skip" : "Discard"}</button>
+          ${canHit ? `<span class="muted">Or tap a group on the table to add this card.</span>` : ""}`;
+      }
+    }
+
+    return `<div class="topbar">
+        <span class="lbl">Room ${esc(ui.snap.code)} · Hand ${v.handNo}</span>
+        <button type="button" class="link" data-do="leave">Leave</button>
+      </div>
+      <ul class="players">${players}</ul>
+      <section class="center">
+        <div class="piles">
+          <button type="button" class="pile deck" data-draw="deck" ${canDraw ? "" : "disabled"} aria-label="Draw from deck, ${v.deckCount} cards">
+            <span class="face">Deck</span><span class="sub">${v.deckCount} left</span></button>
+          ${
+            top
+              ? cardHtml(top, { attrs: `data-draw="discard" ${canDraw && top.kind !== "skip" ? "" : "disabled"}` })
+              : `<div class="pile empty">Empty</div>`
+          }
+        </div>
+        <p class="status${myTurn ? " mine" : ""}" aria-live="polite">${status}</p>
+      </section>
+      <section class="table">${table}</section>
+      <section class="me-area">
+        <div class="me-head">
+          <div><p class="lbl">Your Phase ${Math.min(me.phase, 10)}</p><p class="goal">${esc(describePhase(me.phase))}</p></div>
+          <div class="sort" role="group" aria-label="Sort hand">
+            <button type="button" class="chip${ui.sort === "number" ? " on" : ""}" data-sort="number">1–12</button>
+            <button type="button" class="chip${ui.sort === "color" ? " on" : ""}" data-sort="color">Color</button>
+          </div>
+        </div>
+        <div class="hand">${sortedHand(me.hand || [])
+          .map((c) => cardHtml(c, { selected: sel.includes(c.id), attrs: `data-card="${c.id}"` }))
+          .join("")}</div>
+        <div class="actions">${actions}</div>
+      </section>
+      <details class="log"><summary>Game log</summary><ul>${v.log
+        .slice(-12)
+        .reverse()
+        .map((l) => `<li>${esc(l)}</li>`)
+        .join("")}</ul></details>
+      ${v.status === "between" || v.status === "finished" ? resultsHtml(v) : ""}`;
+  }
+
+  function groupHtml(g, gi, canHit) {
+    const label = g.kind === "set" ? `Set of ${g.n}s` : g.kind === "run" ? `Run ${g.start}–${g.end}` : `All ${g.c}`;
+    return `<button type="button" class="group${canHit ? " target" : ""}" data-group="${gi}" ${canHit ? "" : "disabled"}
+      aria-label="${esc(label)}${canHit ? ", add selected card" : ""}">
+      <span class="g-label">${esc(label)}</span>
+      <span class="g-cards">${g.cards.map((c) => cardHtml(c, { small: true, attrs: 'aria-hidden="true"' })).join("")}</span></button>`;
+  }
+
+  function resultsHtml(v) {
+    const last = v.lastHand;
+    const byId = Object.fromEntries(v.players.map((p) => [p.id, p]));
+    const finished = v.status === "finished";
+    const standings = v.players.slice().sort((a, b) => b.phase - a.phase || a.score - b.score);
+    const title = finished
+      ? `${v.winners.map((id) => esc(byId[id]?.name)).join(" & ")} ${v.winners.length > 1 ? "win" : "wins"}!`
+      : `${esc(byId[last.wentOut]?.name)} went out`;
+    return `<div class="overlay" role="dialog" aria-modal="true" aria-label="Hand results"><div class="sheet">
+        <p class="lbl">${finished ? "Game over" : `End of hand ${last.handNo}`}</p>
+        <h2>${title}</h2>
+        <table><thead><tr><th>Player</th><th>This hand</th><th>Phase</th><th>Total</th></tr></thead><tbody>
+        ${standings
+          .map((p) => {
+            const r = last.results.find((x) => x.id === p.id) || {};
+            return `<tr${v.winners.includes(p.id) ? ' class="win"' : ""}><td>${esc(p.name)}</td>
+              <td>${r.completed ? `Phase ${r.completed} ✓` : "Missed"} · +${r.points ?? 0}</td>
+              <td>${p.phase > 10 ? "Done" : p.phase}</td><td>${p.score}</td></tr>`;
+          })
+          .join("")}</tbody></table>
+        ${
+          finished
+            ? `<button type="button" class="btn primary" data-do="leave">Back to start</button>`
+            : `<button type="button" class="btn primary" data-do="next">Deal hand ${v.handNo + 1}</button>`
+        }
+      </div></div>`;
+  }
+
+  function render() {
+    const s = ui.snap;
+    let body;
+    if (s.screen === "loading") body = `<p class="muted center-msg">${esc(s.message || "Loading…")}</p>`;
+    else if (s.screen === "unavailable") body = `<section class="panel"><h1 class="small-h">Phase Ten</h1><p>${esc(s.message)}</p></section>`;
+    else if (s.screen === "home") body = homeHtml();
+    else if (s.view.status === "lobby") body = lobbyHtml(s.view);
+    else body = gameHtml(s.view);
+    const focusId = document.activeElement && document.activeElement.id;
+    const focusVal = focusId && document.getElementById(focusId)?.value;
+    root.innerHTML = `<main class="wrap${ui.busy ? " busy" : ""}">${body}</main>${
+      ui.toast ? `<div class="toast" role="alert">${esc(ui.toast)}</div>` : ""
+    }`;
+    if (focusId) {
+      const el = document.getElementById(focusId);
+      if (el) {
+        if (focusVal !== undefined) el.value = focusVal;
+        el.focus();
+      }
+    }
+  }
+
+  // ---------- events ----------
+
+  const nameValue = () => (document.getElementById("name")?.value || "").trim();
+
+  root.addEventListener("click", (e) => {
+    const t = e.target.closest("button, [data-card]");
+    if (!t || t.disabled) return;
+    const d = t.dataset;
+    const v = ui.snap.view;
+
+    if (d.card !== undefined) {
+      const id = Number(d.card);
+      ui.selected = ui.selected.includes(id) ? ui.selected.filter((x) => x !== id) : [...ui.selected, id];
+      ui.skipPick = false;
+      return render();
+    }
+    if (d.sort) {
+      ui.sort = d.sort;
+      try {
+        localStorage.setItem("p10-sort", d.sort);
+      } catch {}
+      return render();
+    }
+    if (d.draw) return act({ type: "draw", source: d.draw });
+    if (d.group !== undefined) return act({ type: "hit", cardId: ui.selected[0], groupIndex: Number(d.group) });
+    if (d.skip) return act({ type: "discard", cardId: ui.selected[0], skipTarget: d.skip });
+    if (d.kick) return act({ type: "leave", playerId: d.kick });
+    if (d.join) {
+      const name = nameValue();
+      if (!name && d.mine === undefined) return setToast("Enter your name first.");
+      return run(() => transport.joinGame(d.join, name));
+    }
+    switch (d.do) {
+      case "create": {
+        const name = nameValue();
+        if (!name) return setToast("Enter your name first.");
+        return run(() => transport.createGame(name));
+      }
+      case "start":
+        return act({ type: "start" });
+      case "next":
+        return act({ type: "nextHand" });
+      case "lay":
+        return act({ type: "layDown", cardIds: ui.selected.slice() });
+      case "discard": {
+        const me = v.players.find((p) => p.id === v.me);
+        const card = me.hand.find((c) => c.id === ui.selected[0]);
+        if (card && card.kind === "skip" && v.players.length > 2) {
+          ui.skipPick = true;
+          return render();
+        }
+        return act({ type: "discard", cardId: ui.selected[0] });
+      }
+      case "cancel-skip":
+        ui.skipPick = false;
+        return render();
+      case "copy": {
+        const url = transport.shareUrl(ui.snap.code);
+        const done = () => setToast("Invite link copied.");
+        if (navigator.clipboard) navigator.clipboard.writeText(url).then(done, () => setToast(url));
+        else setToast(url);
+        return;
+      }
+      case "leave":
+        ui.selected = [];
+        return run(() => transport.leave());
+    }
+  });
+
+  // Keep typed text across re-renders triggered by live updates.
+  root.addEventListener("input", (e) => {
+    if (e.target.id === "name") ui.name = e.target.value;
+    if (e.target.id === "join-code") ui.code = e.target.value;
+  });
+
+  root.addEventListener("submit", (e) => {
+    if (e.target.id !== "join-form") return;
+    e.preventDefault();
+    const code = (document.getElementById("join-code")?.value || "").trim().toUpperCase();
+    const name = nameValue();
+    if (!name) return setToast("Enter your name first.");
+    if (!/^[A-Z]{5}$/.test(code)) return setToast("Room codes are 5 letters.");
+    run(() => transport.joinGame(code, name));
+  });
+
+  render();
+}
+
+// Artifact transport: every game is one document in the artifact's shared store
+// (games/<CODE>). Each client runs the rules engine itself and saves the result,
+// holding a short lease on the document so two players never write at once.
+function createArtifactTransport() {
+  const LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const STALE_MS = 6 * 60 * 60 * 1000;
+  const holder = "t" + Math.random().toString(36).slice(2);
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const saved = {
+    get(k) {
+      try {
+        return localStorage.getItem(k);
+      } catch {
+        return null;
+      }
+    },
+    set(k, v) {
+      try {
+        if (v == null) localStorage.removeItem(k);
+        else localStorage.setItem(k, v);
+      } catch {}
+    },
+  };
+
+  let emit = () => {};
+  let db = null;
+  let uid = null;
+  let defaultName = saved.get("p10-name") || "";
+  let code = saved.get("p10-code");
+  let games = [];
+  let current = null; // latest game state for `code`
+  let unsubGame = null;
+
+  function publish() {
+    if (code && current) {
+      emit({ screen: "game", code, view: viewFor(current, uid) });
+      return;
+    }
+    if (code) return emit({ screen: "loading", message: "Opening your game…" });
+    const now = Date.now();
+    const list = games
+      .filter((g) => g.state && now - g.updated < STALE_MS)
+      .filter((g) => g.state.status === "lobby" || g.state.players.some((p) => p.id === uid))
+      .filter((g) => g.state.status !== "finished")
+      .map((g) => ({
+        code: g.code,
+        hostName: (g.state.players.find((p) => p.id === g.state.host) || g.state.players[0] || {}).name || "Someone",
+        players: g.state.players.length,
+        mine: g.state.players.some((p) => p.id === uid),
+      }));
+    emit({ screen: "home", defaultName, games: list });
+  }
+
+  function watchGame(next) {
+    if (unsubGame) unsubGame();
+    unsubGame = null;
+    code = next;
+    current = null;
+    saved.set("p10-code", code);
+    if (!code) return publish();
+    unsubGame = db.doc("games/" + code).onSnapshot(
+      (snap) => {
+        const data = snap.exists ? snap.data() : null;
+        if (!data || !data.state || !data.state.players.some((p) => p.id === uid)) {
+          // The game is gone or we were removed from it.
+          return watchGame(null);
+        }
+        current = data.state;
+        publish();
+      },
+      () => watchGame(null)
+    );
+    publish();
+  }
+
+  // Read-modify-write under a short lease. `change` gets the current state
+  // (or null) and returns the next one; engine errors propagate to the UI.
+  async function withLease(gameCode, change) {
+    const ref = db.doc("games/" + gameCode);
+    let lease = null;
+    for (let i = 0; i < 20; i++) {
+      lease = await ref.acquire({ holder, ttlMs: 1500 });
+      if (lease.acquired) break;
+      await sleep(150 + Math.random() * 150);
+    }
+    if (!lease || !lease.acquired) throw new Error("The table is busy. Try again.");
+    const snap = await ref.get();
+    const before = snap.exists && snap.data().state ? snap.data().state : null;
+    const state = change(before);
+    if (state === before) return state;
+    await ref.set({ code: gameCode, state, updated: Date.now() });
+    return state;
+  }
+
+  function writeError(e) {
+    if (e && e.code === "invalid_argument") return new Error("You can view this page but not play. Ask the owner to share it with you as a Contributor.");
+    if (e && e.code === "quota_exceeded") return new Error("This page has run out of room for new games. Ask the owner to clear old ones.");
+    return e;
+  }
+
+  return {
+    listsGames: true,
+    shareHint: () => "Friends open this same page and pick your game from Open games.",
+    async init(fn) {
+      emit = fn;
+      emit({ screen: "loading", message: "Connecting…" });
+      const [dbApi, userApi] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
+      db = dbApi;
+      uid = userApi ? await userApi.id() : null;
+      if (!db || !uid) {
+        return emit({ screen: "unavailable", message: "Sign in to claude.ai and open this page from your invite to play with friends." });
+      }
+      if (!defaultName && userApi) defaultName = ((await userApi.me()).name || "").split(" ")[0];
+      db.collection("games")
+        .orderBy("updated", "desc")
+        .limit(30)
+        .onSnapshot(
+          (snap) => {
+            games = snap.docs.map((d) => d.data());
+            if (!code) publish();
+          },
+          () => {}
+        );
+      watchGame(code);
+    },
+    async createGame(name) {
+      saved.set("p10-name", name);
+      defaultName = name;
+      for (let i = 0; i < 8; i++) {
+        const c = Array.from({ length: 5 }, () => LETTERS[Math.floor(Math.random() * LETTERS.length)]).join("");
+        let created = false;
+        try {
+          await withLease(c, (s) => {
+            if (s) return s; // code taken, try another
+            created = true;
+            return createGame(uid, name);
+          });
+        } catch (e) {
+          throw writeError(e);
+        }
+        if (created) return watchGame(c);
+      }
+      throw new Error("Couldn't create a game. Try again.");
+    },
+    async joinGame(c, name) {
+      if (name) {
+        saved.set("p10-name", name);
+        defaultName = name;
+      }
+      try {
+        await withLease(c, (s) => {
+          if (!s) throw new Error("That game no longer exists.");
+          return applyAction(s, uid, { type: "join", name });
+        });
+      } catch (e) {
+        throw writeError(e);
+      }
+      watchGame(c);
+    },
+    async act(action) {
+      try {
+        current = await withLease(code, (s) => {
+          if (!s) throw new Error("That game no longer exists.");
+          return applyAction(s, uid, action);
+        });
+      } catch (e) {
+        throw writeError(e);
+      }
+      publish();
+    },
+    async leave() {
+      if (current && current.status === "lobby") {
+        const leaving = code;
+        await withLease(leaving, (s) => (s ? applyAction(s, uid, { type: "leave" }) : s)).catch(() => {});
+      }
+      watchGame(null);
+    },
+  };
+}
+
+mountApp(document.getElementById("app"), createArtifactTransport());
+})();
+</script>
