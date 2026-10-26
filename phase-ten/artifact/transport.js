@@ -93,7 +93,7 @@ function createArtifactTransport() {
   }
 
   function writeError(e) {
-    if (e && e.code === "invalid_argument") return new Error("You can view this page but not play. Ask the owner to share it with you as a Contributor.");
+    if (e && e.code === "invalid_argument") return new Error("You can watch but not play yet. Ask the owner to invite you to this page by email as an Editor.");
     if (e && e.code === "quota_exceeded") return new Error("This page has run out of room for new games. Ask the owner to clear old ones.");
     return e;
   }
