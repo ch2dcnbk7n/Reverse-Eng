@@ -111,4 +111,7 @@ function createWebTransport() {
   };
 }
 
+// The hosted site gets Netlify's "Powered by Netlify" badge in the bottom
+// corner; the stylesheet keeps the hand clear of it on phones.
+document.documentElement.classList.add("hosted");
 mountApp(document.getElementById("app"), createWebTransport());

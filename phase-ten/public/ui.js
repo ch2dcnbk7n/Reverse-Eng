@@ -275,10 +275,13 @@ export function mountApp(root, transport) {
   }
 
   // The artifact points people at the website, which needs no Claude account.
-  const webLinkHtml = () =>
-    transport.webUrl
+  // A declaration, not a const: the website transport renders during init,
+  // before a const further down this function would exist.
+  function webLinkHtml() {
+    return transport.webUrl
       ? `<a class="btn big web-link" href="${esc(transport.webUrl)}" target="_blank" rel="noopener">Play on the web · no account needed</a>`
       : "";
+  }
 
   function rulesHtml() {
     return `<ol class="phase-list">${PHASES.map((_, i) => `<li><b>${i + 1}</b><span>${esc(describePhase(i + 1))}</span></li>`).join("")}</ol>

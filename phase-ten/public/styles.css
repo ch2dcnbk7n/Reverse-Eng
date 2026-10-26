@@ -544,8 +544,11 @@ p { margin: 0; }
   top: 38%;
   translate: -50% -50%;
   font-family: var(--display);
-  font-size: clamp(34px, 10vw, 60px);
-  white-space: nowrap;
+  font-size: clamp(30px, 9vw, 56px);
+  line-height: 1.05;
+  width: min(92vw, 640px);
+  text-align: center;
+  text-wrap: balance;
   color: #fff;
   text-shadow: 3px 3px 0 var(--red), 6px 6px 0 var(--blue);
   opacity: 0;
@@ -561,6 +564,11 @@ p { margin: 0; }
   100% { opacity: 0; transform: scale(0.9) translateY(-30px) rotate(-3deg); }
 }
 
+/* Leave a strip under the hand for the host's badge, which sits over the
+   bottom-right corner on phones. */
+@media (max-width: 700px) {
+  .hosted .dock { padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+}
 @media (max-width: 420px) {
   .hand, .hand .card { --w: 58px; }
   .deck, .discard-pile .card, .empty-slot { --w: 70px; }
