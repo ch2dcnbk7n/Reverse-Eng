@@ -102,6 +102,7 @@ p { margin: 0; }
 .btn.big { font-family: var(--display); font-weight: 400; font-size: 19px; padding: 14px 20px; border-radius: 18px; width: 100%; box-shadow: 0 5px 0 var(--b-d); }
 .btn.bots { --b: var(--surface-2); --b-d: var(--shadow); font-size: 16px; }
 .btn.bots svg { --seat: var(--surface-2); width: 22px; height: 22px; color: var(--ink); }
+.web-link { --b: var(--blue); --b-d: var(--blue-d); color: #fff; text-decoration: none; text-align: center; }
 .btn .badge { background: #0003; border-radius: 99px; padding: 1px 8px; font-size: 13px; font-variant-numeric: tabular-nums; }
 .chip-btn { padding: 6px 12px 6px 6px; }
 .chip-btn .avatar { --size: 26px; font-size: 11px; }

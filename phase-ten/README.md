@@ -32,6 +32,10 @@ node scripts/dev-server.mjs # http://localhost:8888
 npm run build:artifact      # writes dist/phase-ten-artifact.html
 ```
 
+## Live site
+
+https://phase-ten-friends.netlify.app/ (Netlify project `phase-ten-friends`). It was deployed by upload, so pushing to GitHub does not redeploy it; deploy again with the Netlify CLI or connect the repo as below.
+
 ## Deploy to Netlify
 
 1. Push this repo to GitHub.

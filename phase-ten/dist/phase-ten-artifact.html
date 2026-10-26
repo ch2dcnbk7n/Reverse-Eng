@@ -108,6 +108,7 @@ p { margin: 0; }
 .btn.big { font-family: var(--display); font-weight: 400; font-size: 19px; padding: 14px 20px; border-radius: 18px; width: 100%; box-shadow: 0 5px 0 var(--b-d); }
 .btn.bots { --b: var(--surface-2); --b-d: var(--shadow); font-size: 16px; }
 .btn.bots svg { --seat: var(--surface-2); width: 22px; height: 22px; color: var(--ink); }
+.web-link { --b: var(--blue); --b-d: var(--blue-d); color: #fff; text-decoration: none; text-align: center; }
 .btn .badge { background: #0003; border-radius: 99px; padding: 1px 8px; font-size: 13px; font-variant-numeric: tabular-nums; }
 .chip-btn { padding: 6px 12px 6px 6px; }
 .chip-btn .avatar { --size: 26px; font-size: 11px; }
@@ -1461,8 +1462,15 @@ function mountApp(root, transport) {
         <button type="button" class="btn big bots" data-do="solo">${BOT_ICON}Practice against 2 bots</button>
       </section>
       ${joinBlock}
+      ${webLinkHtml()}
       <details class="panel rules"><summary>How to play</summary>${rulesHtml()}</details>`;
   }
+
+  // The artifact points people at the website, which needs no Claude account.
+  const webLinkHtml = () =>
+    transport.webUrl
+      ? `<a class="btn big web-link" href="${esc(transport.webUrl)}" target="_blank" rel="noopener">Play on the web · no account needed</a>`
+      : "";
 
   function rulesHtml() {
     return `<ol class="phase-list">${PHASES.map((_, i) => `<li><b>${i + 1}</b><span>${esc(describePhase(i + 1))}</span></li>`).join("")}</ol>
@@ -1702,7 +1710,7 @@ function mountApp(root, transport) {
     const s = ui.snap;
     let body;
     if (s.screen === "loading") body = `<div class="center-msg"><span class="dots"><i></i><i></i><i></i></span><p>${esc(s.message || "Loading…")}</p></div>`;
-    else if (s.screen === "unavailable") body = `<section class="panel"><h1 class="logo small-logo"><span class="logo-ten">Phase Ten</span></h1><p>${esc(s.message)}</p></section>`;
+    else if (s.screen === "unavailable") body = `<section class="panel"><h1 class="logo small-logo"><span class="logo-ten">Phase Ten</span></h1><p>${esc(s.message)}</p>${webLinkHtml()}</section>`;
     else if (s.screen === "home") body = homeHtml();
     else if (s.view.status === "lobby") body = lobbyHtml(s.view);
     else body = gameHtml(s.view);
@@ -1943,13 +1951,14 @@ function createArtifactTransport() {
   }
 
   function writeError(e) {
-    if (e && e.code === "invalid_argument") return new Error("You can watch but not play yet. Ask the owner to invite you to this page by email as an Editor.");
+    if (e && e.code === "invalid_argument") return new Error("You can watch but not play here yet. Ask the owner to invite you by email as an Editor, or use Play on the web below.");
     if (e && e.code === "quota_exceeded") return new Error("This page has run out of room for new games. Ask the owner to clear old ones.");
     return e;
   }
 
   return {
     listsGames: true,
+    webUrl: "https://phase-ten-friends.netlify.app/",
     shareHint: () => "Friends open this same page and tap Join under Open tables.",
     async init(fn) {
       emit = fn;
@@ -1958,7 +1967,7 @@ function createArtifactTransport() {
       db = dbApi;
       uid = userApi ? await userApi.id() : null;
       if (!db || !uid) {
-        return emit({ screen: "unavailable", message: "Sign in to claude.ai and open this page from your invite to play with friends." });
+        return emit({ screen: "unavailable", message: "Playing here needs a Claude account. You can play the same game on the web without one." });
       }
       if (!defaultName && userApi) defaultName = ((await userApi.me()).name || "").split(" ")[0];
       db.collection("games")

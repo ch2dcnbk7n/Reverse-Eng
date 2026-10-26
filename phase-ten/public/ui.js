@@ -270,8 +270,15 @@ export function mountApp(root, transport) {
         <button type="button" class="btn big bots" data-do="solo">${BOT_ICON}Practice against 2 bots</button>
       </section>
       ${joinBlock}
+      ${webLinkHtml()}
       <details class="panel rules"><summary>How to play</summary>${rulesHtml()}</details>`;
   }
+
+  // The artifact points people at the website, which needs no Claude account.
+  const webLinkHtml = () =>
+    transport.webUrl
+      ? `<a class="btn big web-link" href="${esc(transport.webUrl)}" target="_blank" rel="noopener">Play on the web · no account needed</a>`
+      : "";
 
   function rulesHtml() {
     return `<ol class="phase-list">${PHASES.map((_, i) => `<li><b>${i + 1}</b><span>${esc(describePhase(i + 1))}</span></li>`).join("")}</ol>
@@ -511,7 +518,7 @@ export function mountApp(root, transport) {
     const s = ui.snap;
     let body;
     if (s.screen === "loading") body = `<div class="center-msg"><span class="dots"><i></i><i></i><i></i></span><p>${esc(s.message || "Loading…")}</p></div>`;
-    else if (s.screen === "unavailable") body = `<section class="panel"><h1 class="logo small-logo"><span class="logo-ten">Phase Ten</span></h1><p>${esc(s.message)}</p></section>`;
+    else if (s.screen === "unavailable") body = `<section class="panel"><h1 class="logo small-logo"><span class="logo-ten">Phase Ten</span></h1><p>${esc(s.message)}</p>${webLinkHtml()}</section>`;
     else if (s.screen === "home") body = homeHtml();
     else if (s.view.status === "lobby") body = lobbyHtml(s.view);
     else body = gameHtml(s.view);

@@ -108,13 +108,14 @@ function createArtifactTransport() {
   }
 
   function writeError(e) {
-    if (e && e.code === "invalid_argument") return new Error("You can watch but not play yet. Ask the owner to invite you to this page by email as an Editor.");
+    if (e && e.code === "invalid_argument") return new Error("You can watch but not play here yet. Ask the owner to invite you by email as an Editor, or use Play on the web below.");
     if (e && e.code === "quota_exceeded") return new Error("This page has run out of room for new games. Ask the owner to clear old ones.");
     return e;
   }
 
   return {
     listsGames: true,
+    webUrl: "https://phase-ten-friends.netlify.app/",
     shareHint: () => "Friends open this same page and tap Join under Open tables.",
     async init(fn) {
       emit = fn;
@@ -123,7 +124,7 @@ function createArtifactTransport() {
       db = dbApi;
       uid = userApi ? await userApi.id() : null;
       if (!db || !uid) {
-        return emit({ screen: "unavailable", message: "Sign in to claude.ai and open this page from your invite to play with friends." });
+        return emit({ screen: "unavailable", message: "Playing here needs a Claude account. You can play the same game on the web without one." });
       }
       if (!defaultName && userApi) defaultName = ((await userApi.me()).name || "").split(" ")[0];
       db.collection("games")
