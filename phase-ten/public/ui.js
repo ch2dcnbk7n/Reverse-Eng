@@ -441,6 +441,7 @@ export function mountApp(root, transport) {
         <span class="room">Room <b>${esc(ui.snap.code)}</b> · Hand ${v.handNo}${ui.snap.offline ? ' <span class="offline">Reconnecting…</span>' : ""}</span>
         <button type="button" class="link" data-do="leave">Leave</button>
       </div>
+      <div class="side">
       <ul class="seats">${seats}</ul>
       <section class="mat">
         <div class="piles">
@@ -456,6 +457,7 @@ export function mountApp(root, transport) {
         </div>
         <p class="turn-pill${d.myTurn ? " mine" : ""}" aria-live="polite">${statusText(v, d)}</p>
       </section>
+      </div>
       <section class="table" aria-label="Phases on the table">${table}
         <details class="log"><summary>Game log</summary><ul>${v.log
           .slice(-12)
