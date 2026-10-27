@@ -205,7 +205,10 @@ export function mountApp(root, transport) {
       }
     }
     const ld = v.lastDraw;
-    if (ld && ld.player !== v.me && JSON.stringify(ld) !== JSON.stringify(prev.lastDraw)) f.drew = ld.source;
+    if (ld && JSON.stringify(ld) !== JSON.stringify(prev.lastDraw)) {
+      f.draw = ld;
+      if (ld.player !== v.me) f.drew = ld.source;
+    }
     f.win = v.status === "finished" && prev.status !== "finished";
     f.handEnd = v.status === "between" && prev.status === "playing";
     f.myTurn = myTurn && !(prev.status === "playing" && prev.players[prev.turn].id === prev.me);
@@ -226,8 +229,64 @@ export function mountApp(root, transport) {
     ui.fresh = diff(prev, snap.view);
     render();
     celebrate(ui.fresh);
+    flyDraw(ui.fresh, snap.view);
     ui.fresh = null;
   });
+
+  // A card flies from the pile that was drawn from: into its slot in your hand
+  // (face down from the deck, then flipping over), or to another player's seat.
+  function flyDraw(f, v) {
+    if (!f || !f.draw || !v || reduceMotion()) return;
+    const { player, source, card } = f.draw;
+    const pile = main.querySelector(source === "deck" ? ".deck" : ".discard-pile");
+    const mine = player === v.me;
+    const target = mine
+      ? [...main.querySelectorAll(".hand .card.incoming")].pop()
+      : main.querySelector(`.seat[data-seat="${CSS.escape(player)}"] .avatar`);
+    if (!pile || !target) return;
+    const from = pile.getBoundingClientRect();
+    const to = target.getBoundingClientRect();
+    const layer = root.querySelector(".fx");
+    const wrap = document.createElement("div");
+    wrap.className = "fly";
+    wrap.style.cssText = `left:${from.left}px;top:${from.top}px;--w:${from.width}px`;
+    wrap.innerHTML =
+      source === "discard" && card
+        ? cardHtml(card, { attrs: 'tabindex="-1" aria-hidden="true"' })
+        : `<div class="fly-back"><span class="deck-mark">10</span></div>`;
+    layer.append(wrap);
+    const dx = to.left + to.width / 2 - (from.left + from.width / 2);
+    const dy = to.top + to.height / 2 - (from.top + from.height / 2);
+    const scale = mine ? to.width / from.width : 0.35;
+    const flight = wrap.animate(
+      [
+        { transform: "translate(0, 0) rotate(0deg) scale(1)", opacity: 1 },
+        { transform: `translate(${dx * 0.45}px, ${dy * 0.45 - 50}px) rotate(-10deg) scale(1.12)`, opacity: 1, offset: 0.45 },
+        { transform: `translate(${dx}px, ${dy}px) rotate(${mine ? 0 : 20}deg) scale(${scale})`, opacity: mine ? 1 : 0 },
+      ],
+      { duration: mine ? 560 : 650, easing: "cubic-bezier(0.25, 0.8, 0.3, 1)" }
+    );
+    const land = () => {
+      wrap.remove();
+      if (mine) {
+        // The real card may have been redrawn meanwhile; find it again.
+        const el = main.querySelector(`.hand .card[data-card="${target.dataset.card}"]`);
+        if (el) {
+          el.classList.remove("incoming");
+          el.classList.add(source === "deck" ? "flip-in" : "settle");
+        }
+      } else {
+        const seat = main.querySelector(`.seat[data-seat="${CSS.escape(player)}"]`);
+        if (seat) {
+          seat.classList.remove("got-card");
+          void seat.offsetWidth;
+          seat.classList.add("got-card");
+        }
+      }
+    };
+    flight.onfinish = land;
+    flight.oncancel = land;
+  }
 
   function celebrate(f) {
     if (!f) return;
@@ -444,9 +503,7 @@ export function mountApp(root, transport) {
     const turnP = v.players[v.turn];
     if (v.status !== "playing") return "Hand over";
     if (!d.myTurn) return turnP.bot ? `${esc(turnP.name)} is calculating…` : `${esc(turnP.name)} is thinking…`;
-    if (v.step === "draw") return "Your turn · draw";
-    if (!d.me.laid) return `Your turn · Phase ${d.me.phase}, then discard`;
-    return "Your turn · play cards, then discard";
+    return v.step === "draw" ? "Your turn · draw" : "Your turn · discard";
   }
 
   function gameHtml(v) {
@@ -460,7 +517,7 @@ export function mountApp(root, transport) {
         const badges =
           (i === v.dealer ? `<b class="dealer" title="Dealer">D</b>` : "") +
           (p.skipped ? `<b class="skipmark" title="Skipped next turn">${SKIP_ICON}</b>` : "");
-        return `<li class="seat${active ? " active" : ""}${p.id === v.me ? " me" : ""}${p.skipped ? " skipped" : ""}">
+        return `<li class="seat${active ? " active" : ""}${p.id === v.me ? " me" : ""}${p.skipped ? " skipped" : ""}" data-seat="${esc(p.id)}">
           ${avatarHtml(p.name, SEAT_COLORS[i % SEAT_COLORS.length], badges, p.bot)}
           <div class="seat-info">
             <div class="seat-name">${esc(p.name)}${p.id === v.me ? ' <span class="you">you</span>' : ""}</div>
@@ -489,7 +546,8 @@ export function mountApp(root, transport) {
     const handHtml = hand
       .map((c, i) => {
         const off = i - mid;
-        const cls = f.deal ? "deal" : f.cards.has(c.id) ? "fresh" : "";
+        const flying = f.draw && f.draw.player === v.me && !reduceMotion();
+        const cls = f.deal ? "deal" : f.cards.has(c.id) ? (flying ? "incoming" : "fresh") : "";
         const style = `--i:${i};--r:${(off * tilt).toFixed(2)}deg;--y:${(off * off * 0.7).toFixed(1)}px`;
         return cardHtml(c, { selected: ui.selected.includes(c.id), attrs: `data-card="${c.id}"`, cls, style });
       })

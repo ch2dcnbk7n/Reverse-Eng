@@ -399,6 +399,27 @@ p { margin: 0; }
 .discard-pile.pulled::after { animation: pilePulled 0.6s ease both; }
 @keyframes pilePulled { 0% { transform: translate(0, -36px) rotate(12deg); opacity: 0.2; } }
 
+/* A card flying from a pile to whoever drew it. */
+.fly { position: absolute; z-index: 31; pointer-events: none; will-change: transform; }
+.fly .card { --w: inherit; animation: none; box-shadow: inset 0 0 0 3px #fff, 0 3px 0 var(--edge), 0 16px 30px #000a; }
+.fly-back {
+  width: var(--w);
+  aspect-ratio: 5 / 7.4;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: repeating-linear-gradient(45deg, #ffffff10 0 6px, transparent 6px 12px), linear-gradient(160deg, #2f2885, #191454);
+  box-shadow: inset 0 0 0 3px #fff, 0 16px 30px #000a;
+}
+.fly-back .deck-mark { font-size: calc(var(--w) * 0.42); }
+.hand .card.incoming { opacity: 0; }
+.hand .card.flip-in { animation: flipIn 0.32s cubic-bezier(0.3, 1.4, 0.5, 1) both; }
+@keyframes flipIn { from { transform: scaleX(0.05); filter: brightness(0.6); } }
+.hand .card.settle { animation: settle 0.3s ease-out both; }
+@keyframes settle { from { transform: translateY(-8px) scale(1.06); } }
+.seat.got-card .avatar { animation: bump 0.45s cubic-bezier(0.3, 1.6, 0.5, 1); }
+@keyframes bump { 40% { transform: scale(1.25); } }
+
 /* Each player's current phase on their seat. */
 .seat-phase { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink); min-width: 0; white-space: nowrap; }
 .seat-phase b { flex: none; font-family: var(--display); font-weight: 400; font-size: 12px; padding: 1px 6px; border-radius: 6px; background: var(--surface-2); color: var(--yellow); }
@@ -709,6 +730,11 @@ p { margin: 0; }
   .screen-game .card.small .pip { font-size: 17px; }
   .screen-game .card.small.two .pip { font-size: 14px; }
   .screen-game .dock { margin: 0; border: 2px solid var(--line); border-bottom: 0; }
+  /* Buttons share the top row with your phase, so the panel never grows. */
+  .screen-game .dock { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "head actions" "hand hand"; column-gap: 16px; align-items: center; }
+  .screen-game .dock-head { grid-area: head; min-width: 0; }
+  .screen-game .actions { grid-area: actions; justify-content: flex-end; }
+  .screen-game .hand { grid-area: hand; }
   .screen-game .dock.mine { border-color: var(--yellow); }
 }
 
@@ -727,7 +753,9 @@ p { margin: 0; }
 
 @media (min-width: 900px) and (max-height: 660px) {
   .screen-game .mat { flex-direction: row; justify-content: center; padding: 10px; }
-  .screen-game .mat-info { flex: 1 1 0; }
+  .screen-game .mat-info { flex: 1 1 0; gap: 4px; }
+  .screen-game .draw-note { font-size: 11px; }
+  .screen-game .draw-note .src { display: none; }
   .screen-game .turn-pill { font-size: 13px; line-height: 1.3; }
   .screen-game .deck, .screen-game .discard-pile .card, .screen-game .empty-slot { --w: 50px; }
   .screen-game .deck-mark { font-size: 20px; }
