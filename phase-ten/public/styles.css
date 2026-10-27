@@ -382,6 +382,34 @@ p { margin: 0; }
 .empty-slot { width: var(--w); aspect-ratio: 5 / 7.4; border-radius: 12px; border: 2px dashed var(--line); color: var(--muted); display: grid; place-items: center; font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; }
 .turn-pill { padding: 7px 16px; border-radius: 99px; background: var(--bg); color: var(--muted); font-weight: 700; font-size: 14px; text-align: center; }
 .turn-pill.mine { background: var(--yellow); color: #2a1d00; box-shadow: 0 4px 0 var(--yellow-d); }
+.mat-info { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0; }
+
+/* Where the latest draw came from. */
+.draw-note { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--ink); text-align: left; }
+.draw-note > span:last-child { display: inline-flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.draw-note .src { flex: none; font-size: 9px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; padding: 3px 7px; border-radius: 6px; }
+.draw-note.from-deck .src { background: var(--surface-2); color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); }
+.draw-note.from-discard .src { background: var(--yellow); color: #2a1d00; }
+.draw-note .card.small { --w: 22px; display: inline-grid; vertical-align: middle; }
+.draw-note .card.small .pip { font-size: 11px; }
+.draw-note.pop { animation: notePop 0.5s cubic-bezier(0.2, 1.5, 0.4, 1) both; }
+@keyframes notePop { from { transform: scale(0.7); opacity: 0; } }
+.deck.pulled { animation: deckPulled 0.6s ease both; }
+@keyframes deckPulled { 30% { transform: translateY(-10px) rotate(-4deg); } }
+.discard-pile.pulled::after { animation: pilePulled 0.6s ease both; }
+@keyframes pilePulled { 0% { transform: translate(0, -36px) rotate(12deg); opacity: 0.2; } }
+
+/* Each player's current phase on their seat. */
+.seat-phase { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink); min-width: 0; white-space: nowrap; }
+.seat-phase b { flex: none; font-family: var(--display); font-weight: 400; font-size: 12px; padding: 1px 6px; border-radius: 6px; background: var(--surface-2); color: var(--yellow); }
+.seat-phase span { overflow: hidden; text-overflow: ellipsis; }
+.seat-phase .short { display: none; }
+.seat-phase i { font-style: normal; color: var(--green); font-weight: 800; }
+.seat-phase.done b { background: var(--green); color: #fff; }
+
+/* Dragging a card in your hand. */
+.hand .card { touch-action: none; cursor: grab; }
+.hand .card.dragging { z-index: 20; rotate: 0deg; scale: 1.08; cursor: grabbing; transition: none; box-shadow: inset 0 0 0 3px #fff, 0 0 0 3px var(--yellow), 0 18px 30px #000a; }
 
 /* ---------- game: table ---------- */
 .table { display: flex; flex-direction: column; gap: 12px; }
@@ -596,7 +624,8 @@ p { margin: 0; }
 .screen-game .piles { gap: 18px; }
 .screen-game .deck, .screen-game .discard-pile .card, .screen-game .empty-slot { --w: 62px; }
 .screen-game .deck-mark { font-size: 26px; }
-.screen-game .turn-pill { flex: 0 1 190px; font-size: 13px; line-height: 1.3; }
+.screen-game .mat-info { flex: 0 1 200px; }
+.screen-game .turn-pill { font-size: 13px; line-height: 1.3; }
 .screen-game .table {
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -622,7 +651,22 @@ p { margin: 0; }
   .screen-game .seat-info { gap: 3px; }
   .screen-game .seat-name { font-size: 13px; }
   .screen-game .seat-stats { font-size: 11px; gap: 2px 8px; flex-wrap: nowrap; white-space: nowrap; }
-  .screen-game .done-chip { display: none; } /* the phase tracker shows it */
+  .screen-game .done-chip { display: none; } /* the phase line shows it */
+  /* Avatar and name on top; cards, points and the phase each get a full line. */
+  .screen-game .seat { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 6px; row-gap: 3px; }
+  .screen-game .seat-info { display: contents; }
+  .screen-game .seat .avatar { --size: 24px; font-size: 10px; }
+  .screen-game .seat .avatar b { width: 14px; height: 14px; font-size: 8px; right: -5px; bottom: -5px; }
+  .screen-game .seat .avatar .skipmark { left: -5px; top: -5px; }
+  .screen-game .seat-stats, .screen-game .seat-phase { grid-column: 1 / -1; }
+  .screen-game .seat-phase { font-size: 11px; gap: 4px; white-space: normal; line-height: 1.15; }
+  .screen-game .seat-phase span { overflow: visible; }
+  .screen-game .seat-phase .full { display: none; }
+  .screen-game .seat-phase .short { display: inline; }
+  .screen-game .sort .chip { padding: 5px 9px; }
+  .screen-game .goal { font-size: 14px; }
+  .screen-game .seat .track { display: none; }
+  .screen-game .draw-note { font-size: 11px; gap: 6px; }
   .screen-game .track { gap: 2px; }
   .screen-game .track i { height: 4px; min-width: 4px; }
   .screen-game .mat { padding: 10px; gap: 14px; }
@@ -651,9 +695,13 @@ p { margin: 0; }
   .screen-game .side { grid-area: side; display: flex; flex-direction: column; gap: inherit; min-height: 0; overflow: hidden auto; scrollbar-width: thin; }
   .screen-game .seats { flex-direction: column; overflow: visible; flex: none; }
   .screen-game .seat { flex: none; }
+  /* Name with cards and points on one line, then the phase, then progress. */
+  .screen-game .seat-info { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 8px; }
+  .screen-game .seat-phase, .screen-game .seat .track { grid-column: 1 / -1; }
+  .screen-game .done-chip { display: none; } /* the phase line's check mark shows it */
   .screen-game .mat { flex-direction: column; flex: none; padding: 18px 12px 14px; }
   .screen-game .deck, .screen-game .discard-pile .card, .screen-game .empty-slot { --w: clamp(56px, 8.5vh, 74px); }
-  .screen-game .turn-pill { flex: none; }
+  .screen-game .mat-info { flex: none; }
   .screen-game .table { background: var(--bg-2); border: 2px solid var(--line); border-radius: 22px; padding: 16px; -webkit-mask-image: none; mask-image: none; }
   .screen-game .table-empty { border: 0; padding: 40px 0; }
   .screen-game .group { padding: 8px 10px 10px; }
@@ -679,7 +727,8 @@ p { margin: 0; }
 
 @media (min-width: 900px) and (max-height: 660px) {
   .screen-game .mat { flex-direction: row; justify-content: center; padding: 10px; }
-  .screen-game .turn-pill { flex: 1 1 0; font-size: 13px; line-height: 1.3; }
+  .screen-game .mat-info { flex: 1 1 0; }
+  .screen-game .turn-pill { font-size: 13px; line-height: 1.3; }
   .screen-game .deck, .screen-game .discard-pile .card, .screen-game .empty-slot { --w: 50px; }
   .screen-game .deck-mark { font-size: 20px; }
   .screen-game .seat { padding: 4px 10px; }

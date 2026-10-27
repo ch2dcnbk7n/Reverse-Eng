@@ -8,6 +8,8 @@ const esc = (v) =>
 
 const COLOR_ORDER = { red: 0, blue: 1, green: 2, yellow: 3 };
 const SEAT_COLORS = ["#ff4d5e", "#3d8bff", "#19c37d", "#ffc21a", "#b77bff", "#ff8a3d"];
+// Short phase names for the narrow player cards on phones.
+const SHORT_PHASE = ["2 sets of 3", "Set 3 + run 4", "Set 4 + run 4", "Run of 7", "Run of 8", "Run of 9", "2 sets of 4", "7 of a color", "Set 5 + set 2", "Set 5 + set 3"];
 const phaseSize = (phase) => (PHASES[phase - 1] || []).reduce((t, g) => t + g.size, 0);
 const initials = (name) =>
   String(name || "?")
@@ -108,7 +110,8 @@ function createFx(layer) {
 }
 
 export function mountApp(root, transport) {
-  const ui = { snap: { screen: "loading" }, selected: [], sort: "number", busy: false, skipPick: false, fresh: null, seen: new Set() };
+  const ui = { snap: { screen: "loading" }, selected: [], sort: "number", busy: false, skipPick: false, fresh: null, seen: new Set(), order: [], orderKey: null };
+  let drag = null; // the card being dragged; declared here because the first render can run during init
   try {
     ui.sort = localStorage.getItem("p10-sort") || "number";
   } catch {}
@@ -124,6 +127,32 @@ export function mountApp(root, transport) {
     toastLayer.innerHTML = msg ? `<div class="toast" role="alert">${esc(msg)}</div>` : "";
     clearTimeout(setToast.t);
     if (msg) setToast.t = setTimeout(() => setToast(""), 4000);
+  }
+
+  // Your own card order is kept per hand on this device (card ids are reused
+  // when the deck is reshuffled for the next hand).
+  const orderKey = () => `p10-order-${ui.snap.code}-${ui.snap.view && ui.snap.view.handNo}`;
+  function loadOrder() {
+    if (ui.orderKey === orderKey()) return;
+    ui.orderKey = orderKey();
+    try {
+      ui.order = JSON.parse(localStorage.getItem(ui.orderKey)) || [];
+    } catch {
+      ui.order = [];
+    }
+  }
+  function saveOrder(ids) {
+    ui.order = ids;
+    ui.orderKey = orderKey();
+    try {
+      localStorage.setItem(ui.orderKey, JSON.stringify(ids));
+    } catch {}
+  }
+  function setSort(sort) {
+    ui.sort = sort;
+    try {
+      localStorage.setItem("p10-sort", sort);
+    } catch {}
   }
 
   async function run(fn) {
@@ -175,6 +204,8 @@ export function mountApp(root, transport) {
         if (p.laid && pp && !pp.laid) f.events.push(p.id === v.me ? `Phase ${p.phase} done!` : `${p.name} made Phase ${p.phase}`);
       }
     }
+    const ld = v.lastDraw;
+    if (ld && ld.player !== v.me && JSON.stringify(ld) !== JSON.stringify(prev.lastDraw)) f.drew = ld.source;
     f.win = v.status === "finished" && prev.status !== "finished";
     f.handEnd = v.status === "between" && prev.status === "playing";
     f.myTurn = myTurn && !(prev.status === "playing" && prev.players[prev.turn].id === prev.me);
@@ -332,6 +363,13 @@ export function mountApp(root, transport) {
   function sortedHand(hand) {
     const h = hand.slice();
     const rank = (c) => (c.kind === "wild" ? 100 : c.kind === "skip" ? 200 : 0);
+    if (ui.sort === "custom") {
+      // Cards you've placed keep their spot; new ones join on the right.
+      loadOrder();
+      const pos = new Map(ui.order.map((id, i) => [id, i]));
+      const at = (c) => (pos.has(c.id) ? pos.get(c.id) : 1000 + hand.indexOf(c));
+      return h.sort((a, b) => at(a) - at(b));
+    }
     if (ui.sort === "color") {
       h.sort((a, b) => rank(a) - rank(b) || COLOR_ORDER[a.c] - COLOR_ORDER[b.c] || a.n - b.n);
     } else {
@@ -383,6 +421,25 @@ export function mountApp(root, transport) {
       ${d.canHit ? `<span class="hint">or tap a glowing group to add it</span>` : d.me.laid ? `<span class="hint">Pick a card to add to the table or discard</span>` : ""}`;
   }
 
+  function seatPhaseHtml(p) {
+    if (p.phase > 10) return `<div class="seat-phase done"><b>All 10 done</b></div>`;
+    const full = describePhase(p.phase);
+    return `<div class="seat-phase${p.laid ? " done" : ""}" title="Phase ${p.phase}: ${esc(full)}${p.laid ? " (laid down)" : ""}">
+      <b>P${p.phase}</b><span class="full">${esc(full)}</span><span class="short">${esc(SHORT_PHASE[p.phase - 1])}</span>${p.laid ? '<i aria-label="laid down">✓</i>' : ""}</div>`;
+  }
+
+  // Says where the latest draw came from, so everyone can follow the piles.
+  function drawNoteHtml(v, f) {
+    const ld = v.lastDraw;
+    const p = ld && v.players.find((x) => x.id === ld.player);
+    if (!p || v.status !== "playing") return "";
+    const who = p.id === v.me ? "You" : esc(p.name);
+    const pop = f.drew ? " pop" : "";
+    return ld.source === "discard"
+      ? `<p class="draw-note from-discard${pop}"><span class="src">Discard</span><span>${who} took ${cardHtml(ld.card, { small: true })}</span></p>`
+      : `<p class="draw-note from-deck${pop}"><span class="src">Deck</span><span>${who} drew from the deck</span></p>`;
+  }
+
   function statusText(v, d) {
     const turnP = v.players[v.turn];
     if (v.status !== "playing") return "Hand over";
@@ -408,6 +465,7 @@ export function mountApp(root, transport) {
           <div class="seat-info">
             <div class="seat-name">${esc(p.name)}${p.id === v.me ? ' <span class="you">you</span>' : ""}</div>
             <div class="seat-stats"><span class="mini-hand" title="Cards in hand">${p.handCount}</span><span>${p.score} pts</span>${p.laid ? '<span class="done-chip">Phase down</span>' : ""}</div>
+            ${seatPhaseHtml(p)}
             ${trackHtml(p)}
           </div></li>`;
       })
@@ -445,9 +503,9 @@ export function mountApp(root, transport) {
       <ul class="seats">${seats}</ul>
       <section class="mat">
         <div class="piles">
-          <button type="button" class="deck" data-draw="deck" ${d.canDraw ? "" : "disabled"} aria-label="Draw from deck, ${v.deckCount} cards left">
+          <button type="button" class="deck${f.drew === "deck" ? " pulled" : ""}" data-draw="deck" ${d.canDraw ? "" : "disabled"} aria-label="Draw from deck, ${v.deckCount} cards left">
             <span class="deck-mark">10</span><span class="deck-count">${v.deckCount}</span></button>
-          <div class="discard-pile${v.discardCount > 1 ? " stacked" : ""}">
+          <div class="discard-pile${v.discardCount > 1 ? " stacked" : ""}${f.drew === "discard" ? " pulled" : ""}">
             ${
               top
                 ? cardHtml(top, { cls: f.discard ? "land" : "", attrs: `data-draw="discard" ${d.canDraw && top.kind !== "skip" ? "" : "disabled"}` })
@@ -455,7 +513,10 @@ export function mountApp(root, transport) {
             }
           </div>
         </div>
-        <p class="turn-pill${d.myTurn ? " mine" : ""}" aria-live="polite">${statusText(v, d)}</p>
+        <div class="mat-info">
+          <p class="turn-pill${d.myTurn ? " mine" : ""}" aria-live="polite">${statusText(v, d)}</p>
+          ${drawNoteHtml(v, f)}
+        </div>
       </section>
       </div>
       <section class="table" aria-label="Phases on the table">${table}
@@ -472,10 +533,11 @@ export function mountApp(root, transport) {
           <div class="sort" role="group" aria-label="Sort hand">
             <button type="button" class="chip${ui.sort === "number" ? " on" : ""}" data-sort="number">1–12</button>
             <button type="button" class="chip${ui.sort === "color" ? " on" : ""}" data-sort="color">Color</button>
+            <button type="button" class="chip${ui.sort === "custom" ? " on" : ""}" data-sort="custom" title="Your own order: drag cards to rearrange">Mine</button>
           </div>
         </div>
         <div class="actions">${actionsHtml(v, d)}</div>
-        <div class="hand" style="--n:${n}">${handHtml}</div>
+        <div class="hand" style="--n:${n}" title="Drag cards to rearrange">${handHtml}</div>
       </section>
       ${v.status === "between" || v.status === "finished" ? resultsHtml(v) : ""}`;
   }
@@ -522,6 +584,11 @@ export function mountApp(root, transport) {
   }
 
   function render() {
+    // Redrawing mid-drag would drop the card out of the player's finger.
+    if (drag && drag.moved) {
+      drag.renderLater = true;
+      return;
+    }
     const s = ui.snap;
     let body;
     if (s.screen === "loading") body = `<div class="center-msg"><span class="dots"><i></i><i></i><i></i></span><p>${esc(s.message || "Loading…")}</p></div>`;
@@ -560,6 +627,54 @@ export function mountApp(root, transport) {
     });
   }
 
+  // ---------- dragging cards to rearrange the hand ----------
+  // A tap still selects a card; moving the finger or mouse past a few pixels
+  // picks the card up instead, and dropping it saves your own order.
+
+  main.addEventListener("pointerdown", (e) => {
+    const el = e.target.closest(".hand .card");
+    if (!el || e.button > 0) return;
+    drag = { el, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, moved: false };
+  });
+
+  addEventListener("pointermove", (e) => {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    if (!drag.moved) {
+      if (Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) < 8) return;
+      drag.moved = true;
+      const r = drag.el.getBoundingClientRect();
+      drag.grab = drag.startX - (r.left + r.width / 2);
+      drag.el.classList.add("dragging");
+    }
+    e.preventDefault();
+    const handEl = drag.el.parentElement;
+    const before = [...handEl.children].find((c) => {
+      if (c === drag.el) return false;
+      const r = c.getBoundingClientRect();
+      return e.clientX < r.left + r.width / 2;
+    });
+    if ((before || null) !== drag.el.nextElementSibling) handEl.insertBefore(drag.el, before || null);
+    // Follow the pointer from wherever the card's slot now is.
+    drag.el.style.translate = "";
+    const home = drag.el.getBoundingClientRect();
+    drag.el.style.translate = `${Math.round(e.clientX - drag.grab - (home.left + home.width / 2))}px ${Math.round(Math.min(0, e.clientY - drag.startY) - 26)}px`;
+  });
+
+  function endDrag(e) {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    const done = drag;
+    drag = null;
+    if (!done.moved) return;
+    ui.justDragged = true;
+    setTimeout(() => (ui.justDragged = false), 300);
+    const ids = [...done.el.parentElement.children].map((c) => Number(c.dataset.card));
+    saveOrder(ids);
+    setSort("custom");
+    render();
+  }
+  addEventListener("pointerup", endDrag);
+  addEventListener("pointercancel", endDrag);
+
   // ---------- events ----------
 
   const nameValue = () => (document.getElementById("name")?.value || "").trim();
@@ -571,16 +686,14 @@ export function mountApp(root, transport) {
     const v = ui.snap.view;
 
     if (d.card !== undefined) {
+      if (ui.justDragged) return;
       const id = Number(d.card);
       ui.selected = ui.selected.includes(id) ? ui.selected.filter((x) => x !== id) : [...ui.selected, id];
       ui.skipPick = false;
       return refreshSelection();
     }
     if (d.sort) {
-      ui.sort = d.sort;
-      try {
-        localStorage.setItem("p10-sort", d.sort);
-      } catch {}
+      setSort(d.sort);
       return render();
     }
     if (d.draw) return act({ type: "draw", source: d.draw });

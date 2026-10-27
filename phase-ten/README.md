@@ -42,6 +42,12 @@ https://phase-ten-friends.netlify.app/ (Netlify project `phase-ten-friends`). It
 2. In Netlify: **Add new project → Import an existing project**, pick the repo, and set the **base directory** to `phase-ten`. The build settings come from `netlify.toml`.
 3. Share the site URL. Rooms expire 3 days after their last move.
 
+## Playing
+
+- Tap cards to select them. Drag a card sideways to move it; your order is saved on that device for the hand, under the **Mine** sort.
+- Each player's card shows their current phase (short names on phones), with a check once it's laid down.
+- The note under the turn banner says whether the latest player drew from the deck or took the face-up discard, and which card.
+
 ## Rules implemented
 
 - 108 cards: numbers 1–12 in four colors (two of each), 8 Wilds, 4 Skips. 10 cards each.

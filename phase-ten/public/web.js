@@ -41,6 +41,9 @@ function createWebTransport() {
 
   const home = () => emit({ screen: "home", defaultName: saved.get("p10-name") || "", prefillCode });
   const show = (v) => {
+    // A poll that left before one of our moves can land after it; never let
+    // that older state replace a newer one.
+    if (view && v.seq < view.seq) return;
     view = v;
     emit({ screen: "game", code: session.code, view, offline: false });
   };

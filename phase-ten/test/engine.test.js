@@ -300,3 +300,22 @@ test("random play keeps all 108 cards and never breaks turn order", () => {
     assert.equal(s.step, "draw");
   }
 });
+
+test("lastDraw says where each draw came from, never which deck card", () => {
+  let s = startedGame(["a", "b"], 21);
+  assert.equal(s.lastDraw, null);
+  const first = s.players[s.turn];
+  s = E.draw(s, first.id, "deck");
+  assert.deepEqual(s.lastDraw, { player: first.id, source: "deck", card: null });
+  const card = s.players[s.turn].hand.find((c) => c.kind !== "skip");
+  s = E.discard(s, first.id, card.id);
+  const second = s.players[s.turn];
+  s = E.draw(s, second.id, "discard");
+  assert.equal(s.lastDraw.player, second.id);
+  assert.equal(s.lastDraw.source, "discard");
+  assert.equal(s.lastDraw.card.id, card.id);
+  assert.equal(E.viewFor(s, first.id).lastDraw.card.id, card.id, "everyone sees the taken card");
+  s.status = "between";
+  s = E.nextHand(s, first.id);
+  assert.equal(s.lastDraw, null, "cleared for a new hand");
+});

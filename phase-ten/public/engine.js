@@ -178,6 +178,7 @@ export function createGame(hostId, hostName) {
     discard: [],
     table: [],
     lastHand: null,
+    lastDraw: null,
     winners: [],
     log: [],
   };
@@ -261,6 +262,7 @@ function deal(s, rng) {
     p.skipped = false;
   }
   s.discard = [deck.pop()];
+  s.lastDraw = null;
   s.deck = deck;
   s.table = [];
   s.step = "draw";
@@ -304,6 +306,7 @@ export function draw(state, playerId, source, rng = Math.random) {
     if (!top) fail("The discard pile is empty.");
     if (top.kind === "skip") fail("You can't pick up a Skip.");
     p.hand.push(s.discard.pop());
+    s.lastDraw = { player: p.id, source: "discard", card: top };
     log(s, `${p.name} took ${cardLabel(top)} from the discard pile.`);
   } else {
     if (s.deck.length === 0) {
@@ -315,6 +318,8 @@ export function draw(state, playerId, source, rng = Math.random) {
     }
     if (s.deck.length === 0) fail("There are no cards left to draw. Take the discard instead.");
     p.hand.push(s.deck.pop());
+    // A deck card stays secret; everyone only learns where it came from.
+    s.lastDraw = { player: p.id, source: "deck", card: null };
     log(s, `${p.name} drew from the deck.`);
   }
   s.step = "play";
