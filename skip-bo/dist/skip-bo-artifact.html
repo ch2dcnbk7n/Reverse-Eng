@@ -1,0 +1,1889 @@
+<title>Skip-Bo</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Titan+One&family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* Layout: a deep-teal card table. Opponents across the top, the four building
+   piles in the middle, and your stock, discard piles and hand docked at the
+   bottom. Tangerine (the Skip-Bo wild) is the one accent; card numbers keep the
+   real game's blue / green / red bands. */
+:root {
+  --bg: #0a2427;
+  --bg-2: #0f3034;
+  --surface: #143a3f;
+  --surface-2: #1b4a50;
+  --line: #24595f;
+  --ink: #f2fbf8;
+  --muted: #9cc3bd;
+  --accent: #ff8a1f;
+  --accent-d: #c8640a;
+  --blue: #2f7df0;
+  --green: #1f9e5a;
+  --red: #e2403f;
+  --card: #fffaf0;
+  --card-edge: #d9cfb8;
+  --shadow: #031416;
+  --display: "Titan One", "Arial Rounded MT Bold", "Arial Black", system-ui, sans-serif;
+  --body: "Lexend", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body {
+  margin: 0;
+  color: var(--ink);
+  font: 15px/1.45 var(--body);
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(ellipse 90% 60% at 50% 35%, #12454a 0%, transparent 70%),
+    repeating-linear-gradient(45deg, #ffffff06 0 2px, transparent 2px 14px),
+    repeating-linear-gradient(-45deg, #ffffff06 0 2px, transparent 2px 14px);
+  background-attachment: fixed;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); background: var(--bg); z-index: 10; }
+button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent; }
+input {
+  font: inherit;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 2px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  font-weight: 500;
+}
+input::placeholder { color: #6f9c96; }
+input:focus { border-color: var(--accent); outline: none; }
+button:focus-visible, summary:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+.wrap {
+  max-width: 820px;
+  margin: 0 auto;
+  padding-block: 14px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.wrap.busy { cursor: progress; }
+h1, h2 { margin: 0; font-weight: 400; text-wrap: balance; }
+h2 { font-family: var(--display); font-size: 20px; display: flex; align-items: center; gap: 8px; }
+p { margin: 0; }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+.lbl { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted); margin-bottom: 4px; }
+.grow { flex: 1; min-width: 0; }
+.row { display: flex; gap: 10px; align-items: flex-end; }
+.count { font-family: var(--body); font-size: 13px; font-weight: 700; color: var(--muted); background: var(--bg); padding: 2px 8px; border-radius: 99px; }
+
+/* ---------- buttons ---------- */
+.btn {
+  --b: var(--surface-2);
+  --b-d: var(--shadow);
+  border: 0;
+  background: var(--b);
+  border-radius: 14px;
+  padding: 11px 18px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 0 var(--b-d);
+  transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.15s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-decoration: none;
+}
+.btn:hover:not(:disabled) { filter: brightness(1.1); }
+.btn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 var(--b-d); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn.primary { --b: var(--accent); --b-d: var(--accent-d); color: #2b1300; }
+.btn.go { --b: var(--green); --b-d: #12693b; color: #fff; }
+.btn.big { font-family: var(--display); font-weight: 400; font-size: 19px; padding: 14px 20px; border-radius: 18px; width: 100%; box-shadow: 0 5px 0 var(--b-d); }
+.btn.bots { font-size: 16px; }
+.btn.bots svg { --seat: var(--surface-2); width: 22px; height: 22px; color: var(--ink); }
+.web-link { --b: var(--blue); --b-d: #1b55ad; color: #fff; text-align: center; }
+.link { background: none; border: 0; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; padding: 6px; align-self: center; }
+.chip { border: 0; background: var(--bg); color: var(--muted); border-radius: 99px; padding: 7px 12px; font-size: 13px; font-weight: 700; cursor: pointer; }
+.chip.on { background: var(--accent); color: #2b1300; }
+
+.panel { background: var(--bg-2); border: 2px solid var(--line); border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+
+/* ---------- cards ---------- */
+.card {
+  --w: 64px;
+  position: relative;
+  width: var(--w);
+  aspect-ratio: 5 / 7.2;
+  flex: none;
+  border: 0;
+  padding: 0;
+  border-radius: calc(var(--w) * 0.13);
+  background: var(--card);
+  color: var(--ink-card, #1f2a2b);
+  box-shadow: inset 0 0 0 calc(var(--w) * 0.05) var(--band, var(--card-edge)), 0 3px 0 #0003, 0 8px 18px #0005;
+  display: grid;
+  place-items: center;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.card .pip { font-family: var(--display); font-size: calc(var(--w) * 0.52); line-height: 1; color: var(--band); }
+.card .corner { position: absolute; top: calc(var(--w) * 0.07); left: calc(var(--w) * 0.12); font-family: var(--display); font-size: calc(var(--w) * 0.2); line-height: 1; color: var(--band); }
+.card.c-blue { --band: var(--blue); }
+.card.c-green { --band: var(--green); }
+.card.c-red { --band: var(--red); }
+.card.wild {
+  background: radial-gradient(circle at 50% 40%, #ffb35c, var(--accent) 55%, #e2600a);
+  box-shadow: inset 0 0 0 calc(var(--w) * 0.05) #fff6, 0 3px 0 #0003, 0 8px 18px #0005;
+  color: #fff;
+}
+.card .sb { font-family: var(--display); font-size: calc(var(--w) * 0.2); line-height: 0.95; text-align: center; letter-spacing: 0.02em; text-shadow: 0 2px 0 #0004; transform: rotate(-12deg); }
+.card .as { position: absolute; bottom: calc(var(--w) * 0.06); right: calc(var(--w) * 0.1); font-family: var(--display); font-size: calc(var(--w) * 0.22); color: #2b1300; background: #fff; border-radius: 99px; min-width: 1.5em; text-align: center; padding: 0 0.2em; line-height: 1.3; }
+.card.back { background: repeating-linear-gradient(45deg, #ffffff14 0 5px, transparent 5px 10px), linear-gradient(160deg, var(--accent), #c64f00); color: #fff; }
+.card.mini { --w: 30px; box-shadow: inset 0 0 0 2px var(--band, #fff6), 0 2px 0 #0003; }
+.card.mini .corner { display: none; }
+.card.mini.wild .sb { font-size: 6px; }
+.card.tiny { --w: 22px; display: inline-grid; vertical-align: middle; box-shadow: inset 0 0 0 2px var(--band, #fff6); }
+.card.tiny .corner, .card.tiny .as { display: none; }
+.card.tiny.wild .sb { font-size: 5px; }
+.slot { width: var(--w, 64px); aspect-ratio: 5 / 7.2; border-radius: 10px; border: 2px dashed var(--line); display: grid; place-items: center; color: var(--line); font-family: var(--display); font-size: 22px; }
+.slot.mini { --w: 30px; border-radius: 5px; border-width: 1.5px; }
+
+/* A card flying across the table, or following your finger. */
+.fly { position: absolute; z-index: 31; pointer-events: none; will-change: transform; }
+.fly .card { --w: inherit; }
+.fly.dragging { z-index: 40; }
+.fly.dragging .card { transform: rotate(-4deg) scale(1.08); box-shadow: inset 0 0 0 4px var(--band, #fff6), 0 18px 30px #000a; }
+.lifted { opacity: 0.35; }
+
+/* ---------- home ---------- */
+.hero { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 18px 0 6px; gap: 10px; }
+.hero-fan { position: relative; height: 120px; width: 280px; max-width: 100%; }
+.hero-fan .card { position: absolute; left: 50%; bottom: 0; margin-left: -32px; transform-origin: 50% 140%; rotate: calc(var(--i) * 14deg); animation: bob 3.2s ease-in-out infinite; animation-delay: calc(var(--i) * 0.2s); }
+@keyframes bob { 50% { translate: 0 -8px; } }
+.logo { font-family: var(--display); font-size: clamp(60px, 19vw, 104px); line-height: 0.9; display: flex; align-items: baseline; gap: 0.08em; color: var(--card); text-shadow: 0 5px 0 var(--accent-d), 0 10px 24px #0008; }
+.logo .dash { color: var(--accent); }
+.small-logo { font-size: 40px; }
+.tagline-main { color: var(--muted); max-width: 36ch; font-weight: 500; }
+.games { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.games li { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 16px; background: var(--surface); }
+.games li .grow { display: flex; flex-direction: column; }
+.code-input { text-transform: uppercase; letter-spacing: 0.3em; font-weight: 700; }
+.rules summary { cursor: pointer; font-family: var(--display); font-size: 18px; list-style: none; display: flex; justify-content: space-between; }
+.rules summary::after { content: "+"; color: var(--accent); }
+.rules[open] summary::after { content: "–"; }
+.rule-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.rule-list li { display: grid; grid-template-columns: 84px 1fr; gap: 10px; background: var(--surface); border-radius: 12px; padding: 9px 12px; }
+.rule-list b { font-family: var(--display); font-weight: 400; color: var(--accent); }
+.rule-list span { color: var(--muted); }
+
+/* ---------- avatars ---------- */
+.avatar {
+  --size: 40px;
+  position: relative;
+  flex: none;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  background: var(--seat);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: calc(var(--size) * 0.38);
+  box-shadow: inset 0 -3px 0 #0003;
+}
+.avatar.bot svg { width: 64%; height: 64%; color: #fff; }
+.avatar.ghost { background: transparent; border: 2px dashed var(--line); color: var(--line); box-shadow: none; font-size: 22px; }
+
+/* ---------- lobby ---------- */
+.lobby-top { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding: 16px 0 4px; }
+.code-tiles { display: flex; gap: 8px; }
+.code-tiles span {
+  font-family: var(--display);
+  font-size: clamp(30px, 10vw, 46px);
+  width: 1.25em;
+  height: 1.6em;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: var(--card);
+  color: var(--blue);
+  box-shadow: inset 0 0 0 3px var(--blue), 0 5px 0 #0004;
+  rotate: calc((var(--i) - 2) * 3deg);
+}
+.code-tiles span:nth-child(2) { color: var(--green); box-shadow: inset 0 0 0 3px var(--green), 0 5px 0 #0004; }
+.code-tiles span:nth-child(3) { background: var(--accent); color: #fff; box-shadow: inset 0 0 0 3px #fff6, 0 5px 0 #0004; }
+.code-tiles span:nth-child(4) { color: var(--red); box-shadow: inset 0 0 0 3px var(--red), 0 5px 0 #0004; }
+.code-tiles span:nth-child(5) { color: var(--blue); }
+.seat-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 8px; }
+.seat-grid li { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; min-width: 0; }
+.seat-grid .avatar { --size: 56px; }
+.seat-grid .pop { animation: pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both; animation-delay: calc(var(--i) * 70ms); }
+@keyframes pop { from { transform: scale(0.3); opacity: 0; } }
+.seat-label { font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seat-sub { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; min-height: 1em; }
+.add-bot { background: none; border: 0; padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--muted); }
+.add-bot .avatar.ghost { border-color: var(--accent); color: var(--accent); }
+.stock-size .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.waiting { display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--muted); font-weight: 500; }
+.dots { display: inline-flex; gap: 4px; }
+.dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: hop 1s ease-in-out infinite; }
+.dots i:nth-child(2) { background: var(--green); animation-delay: 0.15s; }
+.dots i:nth-child(3) { background: var(--blue); animation-delay: 0.3s; }
+@keyframes hop { 40% { transform: translateY(-6px); } }
+.center-msg { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 80px 0; color: var(--muted); }
+.lost { margin-top: 18vh; text-align: center; }
+.lost h2 { justify-content: center; }
+
+/* ---------- game layout: one screen, nothing scrolls under your hand ---------- */
+.wrap.screen-game {
+  height: 100vh;
+  height: 100dvh;
+  padding-block: 10px 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 10px;
+  overflow: hidden;
+}
+.topbar { display: flex; justify-content: space-between; align-items: center; }
+.room { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; }
+.room b { color: var(--ink); letter-spacing: 0.2em; }
+.offline { margin-left: 6px; padding: 2px 8px; border-radius: 99px; background: var(--red); color: #fff; animation: blink 1.4s ease-in-out infinite; }
+@keyframes blink { 50% { opacity: 0.4; } }
+
+/* Opponents */
+.opps { list-style: none; margin: 0; padding: 0 0 2px; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+.opps::-webkit-scrollbar { display: none; }
+.opp { flex: 1 0 170px; background: var(--bg-2); border: 2px solid transparent; border-radius: 16px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.opp.active { border-color: var(--accent); background: var(--surface); }
+.opp.active .avatar { animation: ring 1.4s ease-in-out infinite; }
+@keyframes ring { 0%, 100% { box-shadow: inset 0 -3px 0 #0003, 0 0 0 0 #ff8a1f99; } 50% { box-shadow: inset 0 -3px 0 #0003, 0 0 0 7px #ff8a1f00; } }
+.opp-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.opp-head .avatar { --size: 26px; font-size: 11px; }
+.opp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.opp-hand { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); font-weight: 700; }
+.opp-hand::before { content: ""; width: 9px; height: 12px; border-radius: 2px; background: var(--ink); box-shadow: 3px -2px 0 -0.5px var(--muted); }
+.opp-piles { display: flex; align-items: center; gap: 10px; }
+.mini-stock { position: relative; display: flex; align-items: center; gap: 4px; }
+.mini-stock b { font-family: var(--display); font-weight: 400; font-size: 15px; color: var(--accent); }
+.mini-discards { display: flex; gap: 3px; }
+
+/* Middle of the table */
+.center { min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: safe center; gap: 12px; padding: 12px; border-radius: 26px; background: radial-gradient(ellipse at 50% 45%, #1d5a60 0%, var(--surface) 75%); border: 2px solid var(--line); box-shadow: inset 0 2px 30px #0006; }
+.center-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; }
+.draw-pile, .done-pile { display: flex; flex-direction: column; align-items: center; font-family: var(--display); font-size: 18px; line-height: 1; color: var(--card); min-width: 56px; }
+.draw-pile small, .done-pile small { font-family: var(--body); font-size: 10px; color: var(--muted); letter-spacing: 0.06em; margin-top: 3px; }
+.turn-pill { padding: 7px 16px; border-radius: 99px; background: var(--bg); color: var(--muted); font-weight: 700; font-size: 14px; text-align: center; }
+.turn-pill.mine { background: var(--accent); color: #2b1300; box-shadow: 0 4px 0 var(--accent-d); }
+.builds { display: flex; gap: 12px; justify-content: center; }
+.build { --w: 72px; background: none; border: 0; padding: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: default; border-radius: 14px; }
+.build .card, .build .slot { --w: inherit; }
+.build .need { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 0.04em; }
+.build.ok { cursor: pointer; }
+.build.ok .card, .build.ok .slot { box-shadow: 0 0 0 3px var(--accent), 0 0 22px #ff8a1f88; animation: beckon 1.3s ease-in-out infinite; }
+.build.ok .slot { border-color: var(--accent); color: var(--accent); }
+.build.ok .need { color: var(--accent); }
+.build.no { opacity: 0.45; }
+.build.hover .card, .build.hover .slot { transform: scale(1.08); }
+@keyframes beckon { 50% { box-shadow: 0 0 0 3px var(--accent), 0 0 34px #ff8a1fcc; } }
+.move-note { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; max-width: 100%; line-height: 1.6; }
+.move-note .card.tiny { margin: 0 2px; }
+.move-note .src { flex: none; font-size: 9px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; padding: 3px 7px; border-radius: 6px; background: var(--surface-2); color: var(--muted); }
+.move-note .src-stock { background: var(--accent); color: #2b1300; }
+
+/* Your dock */
+.dock {
+  position: relative;
+  margin: 0 calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
+  padding: 12px max(16px, env(safe-area-inset-right, 0px)) calc(14px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  background: linear-gradient(180deg, #123a3ff2, #0a2427fa);
+  border-top: 2px solid var(--line);
+  border-radius: 26px 26px 0 0;
+  box-shadow: 0 -12px 30px #0007;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 5;
+}
+.dock.mine { border-top-color: var(--accent); }
+.dock-row { display: flex; align-items: flex-end; gap: 14px; justify-content: center; }
+.my-stock, .my-discard { --w: 58px; position: relative; background: none; border: 0; padding: 0; display: grid; justify-items: center; cursor: pointer; }
+.my-stock .card, .my-stock .slot, .my-discard .card, .my-discard .slot { --w: inherit; grid-area: 1 / 1; }
+.my-stock { --w: 66px; }
+.my-stock .stack-edge { grid-area: 1 / 1; width: var(--w); aspect-ratio: 5 / 7.2; border-radius: calc(var(--w) * 0.13); background: var(--card-edge); translate: 4px 4px; box-shadow: 4px 4px 0 #b9ad93; }
+.pile-label { font-size: 10px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin-top: 9px; }
+.count-badge { position: absolute; top: -8px; right: -8px; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 99px; background: var(--bg); border: 2px solid var(--line); font-size: 11px; display: grid; place-items: center; z-index: 2; }
+.stock-count { background: var(--accent); border-color: var(--accent-d); color: #2b1300; font-family: var(--display); font-weight: 400; font-size: 13px; }
+.my-discards { display: flex; gap: 8px; }
+.my-discard .under { translate: 0 -10px; filter: brightness(0.8); }
+.my-discard.ok .card:not(.under), .my-discard.ok .slot { box-shadow: 0 0 0 3px var(--card), 0 0 16px #fff6; }
+.my-discard.ok .slot { border-color: var(--card); color: var(--card); }
+.sel .card:not(.under), .card.sel { box-shadow: inset 0 0 0 calc(var(--w) * 0.05) var(--band, #fff6), 0 0 0 3px var(--accent), 0 10px 22px #0008; translate: 0 -10px; }
+.my-stock.sel .card, .my-discard.sel .card:not(.under) { translate: 0 -8px; }
+.hint { text-align: center; font-size: 12px; color: var(--muted); min-height: 1.2em; }
+.hint.strong { color: var(--accent); font-weight: 700; }
+.hand { --w: 62px; display: flex; justify-content: center; gap: 8px; min-height: 92px; padding-top: 6px; }
+.hand .card { cursor: pointer; transition: translate 0.15s cubic-bezier(0.3, 1.5, 0.5, 1); touch-action: none; }
+.hand .card:hover { translate: 0 -4px; }
+.hand .card.deal { animation: deal 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.1) both; animation-delay: calc(var(--i) * 70ms); }
+@keyframes deal { from { transform: translate(0, -200px) rotate(-20deg) scale(0.6); opacity: 0; } }
+.my-stock, .my-discard { touch-action: none; }
+
+/* ---------- results ---------- */
+.overlay { position: fixed; inset: 0; background: #031416cc; display: flex; align-items: center; justify-content: center; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); z-index: 20; animation: fade 0.3s ease both; }
+@keyframes fade { from { opacity: 0; } }
+.sheet { background: var(--bg-2); border-radius: 26px; padding: 22px; width: min(480px, 100%); max-height: 100%; overflow: auto; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 0 0 2px var(--accent), 0 30px 60px #000a; animation: rise 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+@keyframes rise { from { transform: translateY(40px) scale(0.92); opacity: 0; } }
+.sheet-title { font-family: var(--display); font-size: 30px; line-height: 1.05; color: var(--accent); }
+.results { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.results li { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 16px; background: var(--surface); }
+.results li.win { background: #ff8a1f22; box-shadow: inset 0 0 0 2px var(--accent); }
+.results .grow { display: flex; flex-direction: column; gap: 2px; }
+.r-sub { font-size: 12px; color: var(--muted); }
+.r-total { font-family: var(--display); font-size: 24px; text-align: right; line-height: 1; }
+.r-total small { display: block; font-family: var(--body); font-size: 10px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+
+/* ---------- toasts & effects ---------- */
+.toast { position: fixed; left: 50%; top: calc(16px + env(safe-area-inset-top, 0px)); translate: -50% 0; background: var(--card); color: #1f2a2b; padding: 12px 18px; border-radius: 16px; font-weight: 700; box-shadow: 0 6px 0 var(--card-edge), 0 16px 30px #0008; max-width: calc(100% - 32px); z-index: 50; animation: drop 0.35s cubic-bezier(0.2, 1.5, 0.4, 1) both; }
+@keyframes drop { from { transform: translateY(-30px); opacity: 0; } }
+.fx { position: fixed; inset: 0; pointer-events: none; z-index: 30; }
+.fx canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.callout { position: absolute; left: 50%; top: 40%; translate: -50% -50%; width: min(92vw, 640px); text-align: center; text-wrap: balance; font-family: var(--display); font-size: clamp(30px, 9vw, 56px); line-height: 1.05; color: var(--card); text-shadow: 0 4px 0 var(--accent-d), 0 8px 20px #0008; opacity: 0; }
+.callout.gold { color: var(--accent); text-shadow: 0 4px 0 #6b2f00, 0 8px 20px #0008; }
+.callout.go { animation: shout 1.5s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+@keyframes shout {
+  0% { transform: scale(0.3) rotate(-8deg); opacity: 0; }
+  18% { transform: scale(1.08) rotate(-3deg); opacity: 1; }
+  30% { transform: scale(1) rotate(-3deg); }
+  80% { opacity: 1; transform: scale(1) rotate(-3deg); }
+  100% { opacity: 0; transform: scale(0.9) translateY(-30px) rotate(-3deg); }
+}
+
+/* ---------- desktop: opponents in a column beside the table ---------- */
+@media (min-width: 900px) {
+  .wrap.screen-game {
+    max-width: 1180px;
+    grid-template-columns: 300px minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas: "top top" "opps center" "dock dock";
+    gap: 14px 20px;
+    padding-block-start: 16px;
+  }
+  .screen-game .topbar { grid-area: top; }
+  .screen-game .opps { grid-area: opps; flex-direction: column; overflow: hidden auto; }
+  .screen-game .opp { flex: none; }
+  .screen-game .center { grid-area: center; }
+  .screen-game .dock { grid-area: dock; margin: 0; border: 2px solid var(--line); border-bottom: 0; }
+  .screen-game .dock.mine { border-color: var(--accent); }
+  .build { --w: clamp(72px, 11vh, 104px); }
+  .builds { gap: 20px; }
+  .opp .card.mini, .opp .slot.mini { --w: 34px; }
+  .dock-row { gap: 24px; }
+}
+@media (min-width: 900px) and (max-height: 760px) {
+  .build { --w: clamp(64px, 10vh, 84px); }
+  .hand { --w: 56px; min-height: 84px; }
+  .my-stock { --w: 58px; }
+  .my-discard { --w: 52px; }
+}
+
+/* ---------- phones ---------- */
+@media (max-width: 899px) {
+  .opp { flex: 1 0 152px; padding: 6px 8px; gap: 5px; }
+  .opp .card.mini, .opp .slot.mini { --w: 21px; border-radius: 4px; }
+  .opp .card.mini .pip { font-size: 11px; }
+  .opp-piles { gap: 6px; }
+  .mini-discards { gap: 2px; }
+  .mini-stock b { font-size: 13px; }
+  .build { --w: 66px; }
+  .builds { gap: 10px; }
+  .center { padding: 10px; gap: 10px; border-radius: 22px; }
+  .turn-pill { font-size: 13px; padding: 6px 12px; }
+  .move-note { font-size: 11px; }
+}
+@media (max-width: 420px) {
+  .build { --w: 60px; }
+  .builds { gap: 8px; }
+  .my-stock { --w: 56px; }
+  .my-discard { --w: 50px; }
+  .my-discards { gap: 6px; }
+  .dock-row { gap: 10px; }
+  .hand { --w: 56px; gap: 6px; min-height: 84px; }
+  .draw-pile, .done-pile { min-width: 44px; font-size: 16px; }
+}
+/* Short phones: smaller cards everywhere so the table still fits one screen. */
+@media (max-width: 899px) and (max-height: 760px) {
+  .wrap.screen-game { gap: 8px; padding-block-start: 8px; }
+  .dock .hint { display: none; }
+  .dock { padding-top: 10px; gap: 6px; }
+  .my-stock { --w: 50px; }
+  .my-discard { --w: 44px; }
+  .my-discards { gap: 6px; }
+  .pile-label { font-size: 9px; margin-top: 2px; }
+  .hand { --w: 52px; min-height: 78px; gap: 6px; padding-top: 4px; }
+  .build { --w: 54px; gap: 3px; }
+  .build .need { font-size: 10px; }
+  .center { gap: 6px; padding: 8px; }
+  .center-head .draw-pile, .center-head .done-pile { font-size: 15px; }
+  .turn-pill { font-size: 12px; padding: 5px 12px; }
+  .move-note { font-size: 11px; line-height: 1.4; }
+  .move-note .card.tiny { --w: 18px; }
+}
+/* The hosted site's badge sits in the bottom corner on phones; web.js measures it. */
+@media (max-width: 700px) {
+  .hosted .dock { padding-bottom: var(--host-badge, calc(62px + env(safe-area-inset-bottom, 0px))); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
+
+</style>
+<div id="app"></div>
+<script>
+(() => {
+// Skip-Bo rules engine. Pure functions over a plain JSON game state, shared by
+// the browser client, the Netlify function and the artifact build. Every action
+// returns a new state or throws a GameError whose message is safe to show players.
+
+const MAX_PLAYERS = 6;
+const HAND_SIZE = 5;
+const PILES = 4; // building piles in the middle, and discard piles per player
+const TOP = 12; // a building pile is finished at 12
+const STOCK_CHOICES = [10, 20, 30];
+
+class GameError extends Error {}
+const fail = (msg) => {
+  throw new GameError(msg);
+};
+
+// ---------- cards ----------
+
+// 144 numbered cards (twelve each of 1–12) and 18 Skip-Bo wild cards.
+function buildDeck() {
+  const deck = [];
+  let id = 0;
+  for (let copy = 0; copy < 12; copy++) {
+    for (let n = 1; n <= TOP; n++) deck.push({ id: id++, kind: "n", n });
+  }
+  for (let i = 0; i < 18; i++) deck.push({ id: id++, kind: "wild" });
+  return deck;
+}
+
+function shuffle(cards, rng = Math.random) {
+  const a = cards.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+const cardLabel = (card) => (card.kind === "wild" ? "Skip-Bo" : String(card.n));
+
+// The official stock is 30 cards with up to 4 players and 20 with 5 or 6.
+const officialStock = (players) => (players <= 4 ? 30 : 20);
+
+// A building pile always runs 1, 2, 3… so the next card it needs is its length + 1.
+const nextFor = (pile) => pile.length + 1;
+const fits = (card, pile) => card.kind === "wild" || card.n === nextFor(pile);
+
+// ---------- game flow ----------
+
+function createGame(hostId, hostName) {
+  return {
+    v: 1,
+    seq: 0,
+    status: "lobby",
+    host: hostId,
+    stockSize: null, // null = official size for the player count
+    players: [newPlayer(hostId, hostName)],
+    turn: 0,
+    round: 0,
+    drawPile: [],
+    build: [[], [], [], []],
+    completed: [],
+    winners: [],
+    moves: [],
+    moveNo: 0,
+    passes: 0,
+    log: [],
+  };
+}
+
+function newPlayer(id, name) {
+  const clean = String(name || "").trim().slice(0, 20);
+  if (!clean) fail("Enter a name to join.");
+  return { id, name: clean, stock: [], hand: [], discards: [[], [], [], []], wins: 0 };
+}
+
+const clone = (s) => JSON.parse(JSON.stringify(s));
+
+function log(s, text) {
+  s.log.push(text);
+  if (s.log.length > 30) s.log.splice(0, s.log.length - 30);
+}
+
+function finish(s) {
+  s.seq += 1;
+  return s;
+}
+
+// Keeps a short history of plays so every screen can animate them in order.
+function record(s, move) {
+  s.moveNo += 1;
+  s.moves.push({ m: s.moveNo, ...move });
+  if (s.moves.length > 24) s.moves.splice(0, s.moves.length - 24);
+}
+
+function addPlayer(state, id, name) {
+  if (state.players.some((p) => p.id === id)) return state;
+  if (state.status !== "lobby") fail("This game has already started.");
+  if (state.players.length >= MAX_PLAYERS) fail(`This game is full (${MAX_PLAYERS} players).`);
+  const s = clone(state);
+  const p = newPlayer(id, name);
+  s.players.push(p);
+  log(s, `${p.name} joined.`);
+  return finish(s);
+}
+
+const BOT_NAMES = ["Robo Rita", "Sprocket", "Gizmo", "Bolt", "Chip", "Widget", "Cog"];
+
+function addBot(state, byId) {
+  if (state.status !== "lobby") fail("Bots can only join before the game starts.");
+  if (byId !== state.host) fail("Only the host can add bots.");
+  if (state.players.length >= MAX_PLAYERS) fail(`The table is full (${MAX_PLAYERS} players).`);
+  const s = clone(state);
+  const taken = new Set(s.players.map((p) => p.name));
+  const name = BOT_NAMES.find((n) => !taken.has(n)) || `Bot ${s.players.length + 1}`;
+  let n = 1;
+  while (s.players.some((p) => p.id === `bot_${n}`)) n++;
+  s.players.push({ ...newPlayer(`bot_${n}`, name), bot: true });
+  log(s, `${name} (bot) sat down.`);
+  return finish(s);
+}
+
+function removePlayer(state, byId, id) {
+  if (state.status !== "lobby") fail("Players can only leave before the game starts.");
+  if (byId !== id && byId !== state.host) fail("Only the host can remove other players.");
+  const s = clone(state);
+  const p = s.players.find((x) => x.id === id);
+  if (!p) return state;
+  s.players = s.players.filter((x) => x.id !== id);
+  const humans = s.players.filter((x) => !x.bot);
+  if (s.host === id && humans.length) s.host = humans[0].id;
+  log(s, `${p.name} left.`);
+  return finish(s);
+}
+
+function setStockSize(state, byId, size) {
+  if (state.status !== "lobby") fail("The stock size is set before the game starts.");
+  if (byId !== state.host) fail("Only the host can change the stock size.");
+  if (size !== null && !STOCK_CHOICES.includes(size)) fail("Pick a stock size of 10, 20 or 30.");
+  const s = clone(state);
+  s.stockSize = size;
+  return finish(s);
+}
+
+function startGame(state, byId, rng = Math.random) {
+  if (state.status !== "lobby") fail("The game has already started.");
+  if (byId !== state.host) fail("Only the host can start the game.");
+  if (state.players.length < 2) fail("You need at least 2 players to start.");
+  const s = clone(state);
+  deal(s, rng);
+  return finish(s);
+}
+
+function deal(s, rng) {
+  const deck = shuffle(buildDeck(), rng);
+  const size = s.stockSize || officialStock(s.players.length);
+  s.round += 1;
+  for (const p of s.players) {
+    p.stock = [];
+    p.hand = [];
+    p.discards = [[], [], [], []];
+  }
+  // Stock cards are dealt one at a time around the table, as at a real table.
+  for (let i = 0; i < size; i++) for (const p of s.players) p.stock.push(deck.pop());
+  s.drawPile = deck;
+  s.build = [[], [], [], []];
+  s.completed = [];
+  s.winners = [];
+  s.moves = [];
+  s.passes = 0;
+  s.status = "playing";
+  s.turn = Math.floor(rng() * s.players.length);
+  log(s, `Round ${s.round}: ${size} stock cards each. ${s.players[s.turn].name} goes first.`);
+  refill(s, s.players[s.turn], rng);
+}
+
+// Tops the hand up to five. When the draw pile runs out, finished building
+// piles are shuffled back in to make a new one.
+function refill(s, p, rng) {
+  let drawn = 0;
+  while (p.hand.length < HAND_SIZE) {
+    if (s.drawPile.length === 0) {
+      if (s.completed.length === 0) break;
+      s.drawPile = shuffle(s.completed, rng);
+      s.completed = [];
+      log(s, "Finished piles were shuffled into a new draw pile.");
+    }
+    p.hand.push(s.drawPile.pop());
+    drawn++;
+  }
+  if (drawn) record(s, { player: p.id, draw: drawn });
+}
+
+function current(state, playerId) {
+  if (state.status !== "playing") fail("The game isn't in progress.");
+  const idx = state.players.findIndex((p) => p.id === playerId);
+  if (idx < 0) fail("You're not in this game.");
+  if (idx !== state.turn) fail(`It's ${state.players[state.turn].name}'s turn.`);
+  return idx;
+}
+
+// Where a card comes from: {type: "hand", cardId}, {type: "stock"} or {type: "discard", index}.
+function source(p, from) {
+  if (!from) fail("Pick a card to play.");
+  if (from.type === "stock") {
+    if (!p.stock.length) fail("Your stock pile is empty.");
+    return { card: p.stock[p.stock.length - 1], take: () => p.stock.pop() };
+  }
+  if (from.type === "discard") {
+    const pile = p.discards[from.index];
+    if (!pile) fail("That discard pile doesn't exist.");
+    if (!pile.length) fail("That discard pile is empty.");
+    return { card: pile[pile.length - 1], take: () => pile.pop() };
+  }
+  if (from.type === "hand") {
+    const i = p.hand.findIndex((c) => c.id === from.cardId);
+    if (i < 0) fail("That card isn't in your hand.");
+    return { card: p.hand[i], take: () => p.hand.splice(i, 1)[0] };
+  }
+  fail("Pick a card to play.");
+}
+
+function play(state, playerId, from, buildIndex, rng = Math.random) {
+  const idx = current(state, playerId);
+  const s = clone(state);
+  const p = s.players[idx];
+  const src = source(p, from);
+  const pile = s.build[buildIndex];
+  if (!pile) fail("Pick one of the four building piles.");
+  const need = nextFor(pile);
+  if (!fits(src.card, pile)) {
+    fail(pile.length ? `That pile needs a ${need} or a Skip-Bo.` : "A building pile starts with a 1 or a Skip-Bo.");
+  }
+  const card = src.take();
+  pile.push({ ...card, as: need });
+  const move = { player: p.id, card, from: { type: from.type, index: from.index ?? null }, to: { type: "build", index: buildIndex }, as: need };
+  if (pile.length === TOP) {
+    s.completed.push(...s.build[buildIndex].map(({ as, ...c }) => c));
+    s.build[buildIndex] = [];
+    move.completed = true;
+    log(s, `${p.name} finished a building pile.`);
+  }
+  record(s, move);
+  s.passes = 0;
+
+  if (from.type === "stock" && p.stock.length === 0) {
+    s.status = "finished";
+    s.winners = [p.id];
+    p.wins += 1;
+    log(s, `${p.name} played their last stock card and won!`);
+    return finish(s);
+  }
+  // Playing your whole hand earns five fresh cards straight away.
+  if (p.hand.length === 0) refill(s, p, rng);
+  return finish(s);
+}
+
+function discard(state, playerId, cardId, pileIndex, rng = Math.random) {
+  const idx = current(state, playerId);
+  const s = clone(state);
+  const p = s.players[idx];
+  const i = p.hand.findIndex((c) => c.id === cardId);
+  if (i < 0) fail("Discard a card from your hand.");
+  const pile = p.discards[pileIndex];
+  if (!pile) fail("Pick one of your four discard piles.");
+  const [card] = p.hand.splice(i, 1);
+  pile.push(card);
+  record(s, { player: p.id, card, from: { type: "hand", index: null }, to: { type: "discard", index: pileIndex } });
+  s.passes = 0;
+  endTurn(s, rng);
+  return finish(s);
+}
+
+// Only when you have nothing left to discard and nothing to draw.
+function pass(state, playerId, rng = Math.random) {
+  const idx = current(state, playerId);
+  if (state.players[idx].hand.length) fail("End your turn by discarding a card.");
+  const s = clone(state);
+  log(s, `${s.players[idx].name} had no cards to discard.`);
+  s.passes = (s.passes || 0) + 1;
+  // A whole round of passes means nobody can ever move again: the fewest
+  // stock cards left wins.
+  if (s.passes >= s.players.length) {
+    const fewest = Math.min(...s.players.map((p) => p.stock.length));
+    s.status = "finished";
+    s.winners = s.players.filter((p) => p.stock.length === fewest).map((p) => p.id);
+    for (const p of s.players) if (s.winners.includes(p.id)) p.wins += 1;
+    log(s, "Nobody can move, so the fewest stock cards left wins.");
+    return finish(s);
+  }
+  endTurn(s, rng);
+  return finish(s);
+}
+
+function endTurn(s, rng) {
+  s.turn = (s.turn + 1) % s.players.length;
+  refill(s, s.players[s.turn], rng);
+}
+
+function restart(state, byId, rng = Math.random) {
+  if (state.status !== "finished") fail("The game isn't over yet.");
+  if (byId !== state.host && !state.players.some((p) => p.id === byId)) fail("You're not in this game.");
+  const s = clone(state);
+  deal(s, rng);
+  return finish(s);
+}
+
+// Applies an action object, the shape every client sends.
+function applyAction(state, playerId, action, rng = Math.random) {
+  switch (action && action.type) {
+    case "join":
+      return addPlayer(state, playerId, action.name);
+    case "leave":
+      return removePlayer(state, playerId, action.playerId || playerId);
+    case "addBot":
+      return addBot(state, playerId);
+    case "stockSize":
+      return setStockSize(state, playerId, action.size ?? null);
+    case "start":
+      return startGame(state, playerId, rng);
+    case "play":
+      return play(state, playerId, action.from, action.build, rng);
+    case "discard":
+      return discard(state, playerId, action.cardId, action.pile, rng);
+    case "pass":
+      return pass(state, playerId, rng);
+    case "restart":
+      return restart(state, playerId, rng);
+    default:
+      fail("Unknown action.");
+  }
+}
+
+// What one player is allowed to see: their own hand, everyone's stock top and
+// size, every discard pile, and only the size of the draw pile.
+function viewFor(state, playerId) {
+  return {
+    ...state,
+    drawPile: undefined,
+    drawCount: state.drawPile.length,
+    completed: undefined,
+    completedCount: state.completed.length,
+    players: state.players.map((p) => ({
+      ...p,
+      stock: undefined,
+      stockCount: p.stock.length,
+      stockTop: p.stock[p.stock.length - 1] || null,
+      hand: p.id === playerId ? p.hand : undefined,
+      handCount: p.hand.length,
+    })),
+    me: playerId,
+  };
+}
+
+// Computer players. A bot makes one move at a time (a play or its closing
+// discard) through the same engine actions a person uses, so other players can
+// watch each card land and the bot can never break a rule.
+
+// Pause before each bot move.
+const BOT_DELAY_MS = 700;
+
+function botToMove(state) {
+  return state.status === "playing" && state.players[state.turn].bot === true;
+}
+
+// Every card the bot could play this moment, with where it comes from.
+function sources(me) {
+  const out = [];
+  if (me.stock.length) out.push({ from: { type: "stock" }, card: me.stock[me.stock.length - 1] });
+  me.discards.forEach((pile, index) => {
+    if (pile.length) out.push({ from: { type: "discard", index }, card: pile[pile.length - 1] });
+  });
+  for (const card of me.hand) out.push({ from: { type: "hand", cardId: card.id }, card });
+  return out;
+}
+
+// The stock top of the player after this one: never hand them their card.
+function nextStockTop(state) {
+  const next = state.players[(state.turn + 1) % state.players.length];
+  const top = next.stock[next.stock.length - 1];
+  return top && top.kind === "n" ? top.n : null;
+}
+
+// Picks this bot's next play, or null when it should discard instead.
+function choosePlay(state) {
+  const me = state.players[state.turn];
+  const piles = state.build;
+  const all = sources(me);
+  const stockTop = me.stock[me.stock.length - 1];
+  const danger = nextStockTop(state);
+
+  // 1. Play the stock card whenever it fits; that's how you win.
+  if (stockTop) {
+    const target = piles.findIndex((p) => fits(stockTop, p));
+    if (target >= 0) {
+      // A Skip-Bo from the stock goes on the pile closest to finishing.
+      const best = stockTop.kind === "wild" ? bestPileForWild(piles, danger) : target;
+      return { from: { type: "stock" }, build: best };
+    }
+  }
+
+  const naturals = all.filter((s) => s.card.kind === "n" && s.from.type !== "stock");
+  const wilds = all.filter((s) => s.card.kind === "wild" && s.from.type !== "stock");
+
+  // 2. Build a pile up towards the stock card, cheapest first. A pile already
+  //    past the stock number can still get there: finish it at 12, then it
+  //    starts again from 1.
+  if (stockTop && stockTop.kind === "n") {
+    const goal = stockTop.n;
+    let best = null;
+    piles.forEach((pile, i) => {
+      const need = nextFor(pile);
+      const path = [];
+      for (let v = need; v !== goal; v = v === TOP ? 1 : v + 1) path.push(v);
+      // Can every step on the way be covered?
+      const gap = path.filter((v) => !naturals.some((s) => s.card.n === v)).length;
+      if (gap > wilds.length) return;
+      if (!best || path.length < best.steps) best = { pile: i, need, steps: path.length };
+    });
+    if (best) {
+      const natural = preferDiscards(naturals.filter((s) => s.card.n === best.need));
+      const pick = natural || preferDiscards(wilds);
+      return { from: pick.from, build: best.pile };
+    }
+  }
+
+  // 3. Clear naturals from the discard piles and hand when that's safe, so
+  //    the hand empties and refills. Discard tops go first to dig deeper.
+  const safe = [];
+  for (const s of all) {
+    if (s.card.kind !== "n" || s.from.type === "stock") continue;
+    piles.forEach((pile, i) => {
+      if (!fits(s.card, pile)) return;
+      const after = s.card.n === TOP ? 1 : s.card.n + 1; // a 12 finishes the pile
+      if (danger && after === danger) return; // would set up the next player
+      safe.push({ ...s, build: i });
+    });
+  }
+  const fromDiscard = safe.find((s) => s.from.type === "discard");
+  const pick = fromDiscard || safe.find((s) => s.from.type === "hand");
+  if (pick) return { from: pick.from, build: pick.build };
+
+  // 4. With no cards left to discard the turn would just pass, so any legal
+  //    play beats waiting, even one that helps the next player.
+  if (!me.hand.length) {
+    for (const s of [...naturals, ...wilds]) {
+      const i = piles.findIndex((p) => fits(s.card, p));
+      if (i >= 0) return { from: s.from, build: i };
+    }
+  }
+  return null;
+}
+
+function preferDiscards(list) {
+  return list.find((s) => s.from.type === "discard") || list[0] || null;
+}
+
+function bestPileForWild(piles, danger) {
+  let best = 0;
+  let bestLen = -1;
+  piles.forEach((pile, i) => {
+    if (danger && nextFor(pile) + 1 === danger) return;
+    if (pile.length > bestLen) {
+      best = i;
+      bestLen = pile.length;
+    }
+  });
+  return best;
+}
+
+// Ends the turn: keep Skip-Bo cards, stack runs downwards on discard piles
+// (a 7 on an 8) so they come back in order, and dump high cards first.
+function chooseDiscard(state) {
+  const me = state.players[state.turn];
+  if (!me.hand.length) return null;
+  const naturals = me.hand.filter((c) => c.kind === "n");
+  const pool = naturals.length ? naturals : me.hand;
+  let best = null;
+  for (const card of pool) {
+    for (let i = 0; i < PILES; i++) {
+      const pile = me.discards[i];
+      const top = pile[pile.length - 1];
+      let score = card.kind === "n" ? card.n / 2 : 0;
+      if (!top) score += 4;
+      else if (top.kind === "n" && card.kind === "n" && top.n === card.n + 1) score += 8;
+      else if (top.kind === "n" && card.kind === "n" && top.n === card.n) score += 6;
+      else score -= pile.length; // don't bury long piles
+      if (!best || score > best.score) best = { cardId: card.id, pile: i, score };
+    }
+  }
+  return best;
+}
+
+// Plays one move for the current bot and returns the new state.
+function botStep(state, rng = Math.random) {
+  const me = state.players[state.turn];
+  const move = choosePlay(state);
+  if (move) return play(state, me.id, move.from, move.build, rng);
+  const d = chooseDiscard(state);
+  if (d) return discard(state, me.id, d.cardId, d.pile, rng);
+  return pass(state, me.id, rng);
+}
+
+// botStep with a fallback: if the strategy ever trips on a rule, just discard
+// so the game never stalls on a bot's turn.
+function safeBotStep(state, rng = Math.random) {
+  try {
+    return botStep(state, rng);
+  } catch {
+    const me = state.players[state.turn];
+    if (me.hand.length) return discard(state, me.id, me.hand[0].id, 0, rng);
+    return pass(state, me.id, rng);
+  }
+}
+
+// Skip-Bo table UI. Renders whatever the transport reports and sends player
+// actions back through it, so the same screen runs on the website (server
+// transport) and in the Claude artifact (shared-store transport).
+
+const esc = (v) =>
+  String(v ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]);
+
+const SEAT_COLORS = ["#ff8a1f", "#2f8cff", "#27b36a", "#e5484d", "#a970ff", "#00b8b0"];
+const seatColor = (i) => SEAT_COLORS[i % SEAT_COLORS.length];
+const initials = (name) =>
+  String(name || "?")
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+const reduceMotion = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+// The real game's colors: 1–4 blue, 5–8 green, 9–12 red.
+const band = (n) => (n <= 4 ? "blue" : n <= 8 ? "green" : "red");
+
+const BOT_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5v3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="2.5" r="1.6" fill="currentColor"/><rect x="4" y="6.5" width="16" height="12.5" rx="4" fill="currentColor"/><circle cx="9" cy="12.5" r="2" fill="var(--seat)"/><circle cx="15" cy="12.5" r="2" fill="var(--seat)"/><path d="M1.5 11v4M22.5 11v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+
+// One card. `as` is the number a Skip-Bo card stands for on a building pile.
+function cardHtml(card, { tag = "div", attrs = "", cls = "", as = null } = {}) {
+  if (!card) return "";
+  if (card.kind === "wild") {
+    return `<${tag} class="card wild ${cls}" ${attrs} aria-label="Skip-Bo${as ? ` as ${as}` : ""}">
+      <span class="sb">SKIP<br>BO</span>${as ? `<span class="as">${as}</span>` : ""}</${tag}>`;
+  }
+  return `<${tag} class="card c-${band(card.n)} ${cls}" ${attrs} aria-label="${card.n}">
+    <span class="corner">${card.n}</span><span class="pip">${card.n}</span></${tag}>`;
+}
+
+function avatarHtml(name, color, bot = false, extra = "") {
+  return `<span class="avatar${bot ? " bot" : ""}" style="--seat:${color}">${bot ? BOT_ICON : esc(initials(name))}${extra}</span>`;
+}
+
+// Short-lived celebration effects drawn above the page.
+function createFx(layer) {
+  const canvas = layer.querySelector("canvas");
+  const callout = layer.querySelector(".callout");
+  let parts = [];
+  let raf = 0;
+
+  function confetti(amount = 140, at = null) {
+    if (reduceMotion()) return;
+    const dpr = devicePixelRatio;
+    canvas.width = innerWidth * dpr;
+    canvas.height = innerHeight * dpr;
+    const colors = ["#ff8a1f", "#2f8cff", "#27b36a", "#e5484d", "#fff3d6"];
+    const x0 = at ? at.x * dpr : canvas.width * 0.5;
+    const y0 = at ? at.y * dpr : canvas.height * 0.35;
+    for (let i = 0; i < amount; i++) {
+      parts.push({
+        x: x0 + (at ? 0 : (Math.random() - 0.5) * canvas.width * 0.6),
+        y: y0,
+        vx: (Math.random() - 0.5) * (at ? 14 : 22) * dpr,
+        vy: (-6 - Math.random() * (at ? 10 : 16)) * dpr,
+        s: (5 + Math.random() * 6) * dpr,
+        r: Math.random() * 6,
+        vr: (Math.random() - 0.5) * 0.4,
+        c: colors[i % colors.length],
+        life: 0,
+      });
+    }
+    if (!raf) raf = requestAnimationFrame(tick);
+  }
+
+  function tick() {
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    parts = parts.filter((p) => p.life < 150 && p.y < canvas.height + 40);
+    for (const p of parts) {
+      p.life++;
+      p.vy += 0.5 * devicePixelRatio;
+      p.vx *= 0.985;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.r += p.vr;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.r);
+      ctx.fillStyle = p.c;
+      ctx.fillRect(-p.s / 2, -p.s / 3, p.s, p.s * 0.66);
+      ctx.restore();
+    }
+    raf = parts.length ? requestAnimationFrame(tick) : 0;
+  }
+
+  function shout(text, tone = "") {
+    callout.textContent = text;
+    callout.className = `callout ${tone}`;
+    void callout.offsetWidth;
+    callout.classList.add("go");
+  }
+
+  return { confetti, shout };
+}
+
+function mountApp(root, transport) {
+  const ui = { snap: { screen: "loading" }, sel: null, busy: false, lastMove: null, seen: new Set() };
+  let drag = null; // declared up here because the first render can run during init
+
+  root.innerHTML = `<main class="wrap"></main>
+    <div class="toast-layer" aria-live="assertive"></div>
+    <div class="fx" aria-hidden="true"><canvas></canvas><div class="callout"></div></div>`;
+  const main = root.querySelector("main");
+  const toastLayer = root.querySelector(".toast-layer");
+  const fxLayer = root.querySelector(".fx");
+  const fx = createFx(fxLayer);
+
+  function setToast(msg) {
+    toastLayer.innerHTML = msg ? `<div class="toast" role="alert">${esc(msg)}</div>` : "";
+    clearTimeout(setToast.t);
+    if (msg) setToast.t = setTimeout(() => setToast(""), 4000);
+  }
+
+  async function run(fn) {
+    if (ui.busy) return;
+    ui.busy = true;
+    main.classList.add("busy");
+    try {
+      await fn();
+    } catch (e) {
+      setToast(e && e.message ? e.message : "Something went wrong. Try again.");
+    } finally {
+      ui.busy = false;
+      main.classList.remove("busy");
+      render(); // flights live in their own layer, so a redraw doesn't cut them short
+    }
+  }
+
+  const act = (action) =>
+    run(async () => {
+      ui.sel = null;
+      await transport.act(action);
+    });
+
+  // ---------- updates and animation ----------
+
+  // Where a move's card was, as an element on screen right now.
+  function sourceEl(move, v) {
+    const pid = move.player;
+    if (move.from.type === "stock") return main.querySelector(`[data-stock="${CSS.escape(pid)}"]`);
+    if (move.from.type === "discard") return main.querySelector(`[data-discard="${CSS.escape(pid)}:${move.from.index}"]`);
+    if (pid === v.me) return main.querySelector(`.hand [data-card="${move.card.id}"]`) || main.querySelector(".hand");
+    return main.querySelector(`[data-hand="${CSS.escape(pid)}"]`);
+  }
+  function targetEl(move) {
+    if (move.to.type === "build") return main.querySelector(`[data-build="${move.to.index}"]`);
+    return main.querySelector(`[data-discard="${CSS.escape(move.player)}:${move.to.index}"]`);
+  }
+
+  function flyCard(card, from, to, { delay = 0, as = null, back = false } = {}) {
+    if (!from || !to || reduceMotion()) return;
+    const el = document.createElement("div");
+    el.className = "fly";
+    const w = Math.min(from.width, to.width * 1.3) || 60;
+    el.style.cssText = `left:${from.left + (from.width - w) / 2}px;top:${from.top}px;--w:${w}px`;
+    el.innerHTML = back ? `<div class="card back"><span class="sb">SKIP<br>BO</span></div>` : cardHtml(card, { as });
+    fxLayer.append(el);
+    const dx = to.left + to.width / 2 - (from.left + from.width / 2);
+    const dy = to.top + to.height / 2 - (from.top + w * 0.74);
+    const scale = to.width && w ? Math.max(0.35, Math.min(1.2, to.width / w)) : 1;
+    const anim = el.animate(
+      [
+        { transform: "translate(0,0) rotate(0deg) scale(1)", opacity: 0, offset: 0 },
+        { opacity: 1, offset: 0.08 },
+        { transform: `translate(${dx * 0.5}px, ${dy * 0.5 - 40}px) rotate(-8deg) scale(1.1)`, offset: 0.5 },
+        { transform: `translate(${dx}px, ${dy}px) rotate(0deg) scale(${scale})`, opacity: 1 },
+      ],
+      { duration: 480, delay, easing: "cubic-bezier(0.3, 0.8, 0.3, 1)", fill: "backwards" }
+    );
+    anim.onfinish = anim.oncancel = () => el.remove();
+  }
+
+  // Captures where new moves start before the screen redraws, then flies the
+  // cards once it has, one after another.
+  function prepareMoves(prev, v) {
+    if (!v || v.status === "lobby") return null;
+    const fresh = (v.moves || []).filter((m) => ui.lastMove !== null && m.m > ui.lastMove);
+    ui.lastMove = v.moveNo;
+    if (!prev || prev.round !== v.round) return { moves: [], deal: true };
+    const plays = fresh.map((m) => ({ m, from: m.to ? sourceEl(m, v)?.getBoundingClientRect() : null }));
+    return { moves: plays };
+  }
+
+  function playMoves(info, v) {
+    if (!info) return;
+    let delay = 0;
+    let completedAt = null;
+    for (const { m, from } of info.moves) {
+      if (m.draw) {
+        if (m.player !== v.me) {
+          const deck = main.querySelector(".draw-pile")?.getBoundingClientRect();
+          const hand = main.querySelector(`[data-hand="${CSS.escape(m.player)}"]`)?.getBoundingClientRect();
+          flyCard(null, deck, hand, { delay, back: true });
+        }
+        continue;
+      }
+      const to = targetEl(m)?.getBoundingClientRect();
+      flyCard(m.card, from, to, { delay, as: m.card.kind === "wild" ? m.as : null });
+      if (m.completed) completedAt = { rect: to, delay };
+      delay += 380;
+    }
+    if (completedAt && completedAt.rect) {
+      setTimeout(() => {
+        const r = completedAt.rect;
+        fx.confetti(70, { x: r.left + r.width / 2, y: r.top + r.height / 2 });
+        fx.shout("Pile complete!");
+      }, completedAt.delay + 450);
+    }
+  }
+
+  transport.init((snap) => {
+    const prev = ui.snap.view;
+    const same =
+      snap.view && prev && ui.snap.code === snap.code && prev.seq === snap.view.seq && prev.me === snap.view.me && !ui.snap.offline === !snap.offline;
+    if (snap.screen !== "game") ui.lastMove = null;
+    const info = snap.screen === "game" ? prepareMoves(prev, snap.view) : null;
+    ui.snap = snap;
+    if (same) return;
+    // Cards new to your hand slide in; a new round deals the whole hand.
+    const mine = (v) => v && v.players.find((p) => p.id === v.me)?.hand;
+    const had = new Set((mine(prev) || []).map((c) => c.id));
+    ui.newCards = new Set((mine(snap.view) || []).filter((c) => !had.has(c.id)).map((c) => c.id));
+    if (info && info.deal) ui.dealt = false;
+    if (ui.sel && !selectedCard(snap.view)) ui.sel = null;
+    render();
+    playMoves(info, snap.view);
+    celebrate(prev, snap.view);
+  });
+
+  function celebrate(prev, v) {
+    if (!v || !prev || v.status === "lobby") return;
+    const myTurn = v.status === "playing" && v.players[v.turn].id === v.me;
+    const wasMine = prev.status === "playing" && prev.players[prev.turn]?.id === prev.me;
+    if (v.status === "finished" && prev.status !== "finished") {
+      // The results card names the winner; confetti is the celebration.
+      fx.confetti(v.winners.includes(v.me) ? 260 : 120);
+    } else if (myTurn && !wasMine) {
+      fx.shout("Your turn");
+      try {
+        navigator.vibrate && navigator.vibrate(25);
+      } catch {}
+    }
+  }
+
+  // ---------- selection ----------
+
+  function selectedCard(v) {
+    if (!ui.sel || !v) return null;
+    const me = v.players.find((p) => p.id === v.me);
+    if (!me) return null;
+    if (ui.sel.type === "stock") return me.stockTop;
+    if (ui.sel.type === "discard") return me.discards[ui.sel.index]?.at(-1) || null;
+    return me.hand?.find((c) => c.id === ui.sel.cardId) || null;
+  }
+  const isSel = (type, key) => ui.sel && ui.sel.type === type && (type === "stock" || (type === "hand" ? ui.sel.cardId === key : ui.sel.index === key));
+
+  // ---------- screens ----------
+
+  function heroCards() {
+    const cards = [{ kind: "n", n: 1 }, { kind: "n", n: 5 }, { kind: "wild" }, { kind: "n", n: 9 }, { kind: "n", n: 12 }];
+    return `<div class="hero-fan" aria-hidden="true">${cards.map((c, i) => cardHtml(c, { attrs: `style="--i:${i - 2}"` })).join("")}</div>`;
+  }
+
+  function webLinkHtml() {
+    return transport.webUrl
+      ? `<a class="btn big web-link" href="${esc(transport.webUrl)}" target="_blank" rel="noopener">Play on the web · no account needed</a>`
+      : "";
+  }
+
+  function homeHtml() {
+    const s = ui.snap;
+    const nameVal = esc(ui.name ?? s.defaultName ?? "");
+    const games = s.games || [];
+    const joinBlock = transport.listsGames
+      ? `<section class="panel"><h2>Open tables</h2>${
+          games.length
+            ? `<ul class="games">${games
+                .map(
+                  (g, i) => `<li>${avatarHtml(g.hostName, seatColor(i))}<div class="grow"><strong>${esc(g.hostName)}'s table</strong>
+                    <span class="muted small">${g.players}/${MAX_PLAYERS} seated · ${esc(g.code)}</span></div>
+                    <button type="button" class="btn ${g.mine ? "go" : ""}" data-join="${esc(g.code)}"${g.mine ? " data-mine" : ""}>${g.mine ? "Rejoin" : "Join"}</button></li>`
+                )
+                .join("")}</ul>`
+            : `<p class="muted">No open tables yet. Start one and tell your friends to open this page.</p>`
+        }</section>`
+      : `<section class="panel"><h2>Got a code?</h2>
+          <form id="join-form" class="row">
+            <label class="grow"><span class="lbl">Room code</span>
+              <input id="join-code" class="code-input" autocomplete="off" maxlength="5" placeholder="ABCDE" value="${esc(ui.code ?? s.prefillCode ?? "")}"></label>
+            <button class="btn go" type="submit">Join</button>
+          </form></section>`;
+    return `<header class="hero">
+        ${heroCards()}
+        <h1 class="logo"><span>Skip</span><span class="dash">·</span><span>Bo</span></h1>
+        <p class="tagline-main">Empty your stock pile first. Build 1 to 12 in the middle with up to ${MAX_PLAYERS} friends.</p>
+      </header>
+      <section class="panel">
+        <label><span class="lbl">Your name</span>
+          <input id="name" maxlength="20" autocomplete="nickname" value="${nameVal}" placeholder="What do your friends call you?"></label>
+        <button type="button" class="btn primary big" data-do="create">Start a table</button>
+        <button type="button" class="btn big bots" data-do="solo">${BOT_ICON}Practice against 2 bots</button>
+      </section>
+      ${joinBlock}
+      ${webLinkHtml()}
+      <details class="panel rules"><summary>How to play</summary>${rulesHtml()}</details>`;
+  }
+
+  function rulesHtml() {
+    return `<ul class="rule-list">
+      <li><b>Goal</b><span>Be first to play every card in your stock pile. Only its top card is face up.</span></li>
+      <li><b>Build</b><span>Four shared building piles go 1, 2, 3… up to 12. A finished pile is cleared and its cards are shuffled back in later.</span></li>
+      <li><b>Skip-Bo</b><span>Wild cards stand in for any number.</span></li>
+      <li><b>Your turn</b><span>You start with five cards in hand. Play from your hand, the top of your stock, or the top of your discard piles. Play all five and you draw five more.</span></li>
+      <li><b>End</b><span>Finish your turn by putting one hand card on one of your four discard piles.</span></li>
+    </ul>`;
+  }
+
+  function lobbyHtml(v) {
+    const isHost = v.host === v.me;
+    const code = String(ui.snap.code || "");
+    const official = officialStock(Math.max(2, v.players.length));
+    const choices = [
+      { size: null, label: `Official · ${official}` },
+      ...STOCK_CHOICES.filter((n) => n !== official).map((n) => ({ size: n, label: n === 10 ? "Quick · 10" : String(n) })),
+    ];
+    const current = v.stockSize ?? null;
+    return `<section class="lobby-top">
+        <p class="lbl">Room code</p>
+        <p class="code-tiles" aria-label="Room code ${esc(code.split("").join(" "))}">${code
+          .split("")
+          .map((ch, i) => `<span style="--i:${i}">${esc(ch)}</span>`)
+          .join("")}</p>
+        ${transport.shareHint ? `<p class="muted">${esc(transport.shareHint(code))}</p>` : ""}
+        ${transport.shareUrl ? `<button type="button" class="btn" data-do="copy">Copy invite link</button>` : ""}
+      </section>
+      <section class="panel">
+        <h2>At the table <span class="count">${v.players.length}/${MAX_PLAYERS}</span></h2>
+        <ul class="seat-grid">${v.players
+          .map(
+            (p, i) => `<li class="${ui.seen.has(p.id) ? "" : "pop"}" style="--i:${i}">${avatarHtml(p.name, seatColor(i), p.bot)}
+              <span class="seat-label">${esc(p.name)}</span>
+              <span class="seat-sub">${p.bot ? "Bot" : ""}${p.id === v.host ? "Host" : ""}${p.id === v.me ? (p.id === v.host ? " · you" : "You") : ""}</span>
+              ${isHost && p.id !== v.me ? `<button type="button" class="link small" data-kick="${esc(p.id)}">Remove</button>` : ""}</li>`
+          )
+          .join("")}${Array.from({ length: MAX_PLAYERS - v.players.length }, (_, k) =>
+          isHost && k === 0
+            ? `<li class="empty-seat"><button type="button" class="add-bot" data-do="add-bot"><span class="avatar ghost">+</span><span class="seat-label">Add a bot</span></button></li>`
+            : `<li class="empty-seat"><span class="avatar ghost"></span></li>`
+        ).join("")}</ul>
+        <div class="stock-size">
+          <span class="lbl">Stock pile size</span>
+          ${
+            isHost
+              ? `<div class="chips" role="group" aria-label="Stock pile size">${choices
+                  .map((c) => `<button type="button" class="chip${c.size === current ? " on" : ""}" data-size="${c.size ?? ""}">${c.label}</button>`)
+                  .join("")}</div>`
+              : `<p>${current ? `${current} cards each` : `Official: ${official} cards each`}</p>`
+          }
+        </div>
+        ${
+          isHost
+            ? `<button type="button" class="btn primary big" data-do="start" ${v.players.length < 2 ? "disabled" : ""}>
+                ${v.players.length < 2 ? "Waiting for a friend…" : `Deal ${v.players.length} players in`}</button>`
+            : `<p class="waiting"><span class="dots"><i></i><i></i><i></i></span>Waiting for ${esc(v.players.find((p) => p.id === v.host)?.name || "the host")} to deal</p>`
+        }
+        <button type="button" class="link" data-do="leave">Leave table</button>
+      </section>`;
+  }
+
+  // Someone else's spot: their stock top and discard tops, all public.
+  function opponentHtml(p, i, v) {
+    const active = v.status === "playing" && i === v.turn;
+    return `<li class="opp${active ? " active" : ""}" style="--seat:${seatColor(i)}">
+      <div class="opp-head">${avatarHtml(p.name, seatColor(i), p.bot)}
+        <strong class="opp-name">${esc(p.name)}</strong>
+        <span class="opp-hand" data-hand="${esc(p.id)}" title="Cards in hand">${p.handCount}</span></div>
+      <div class="opp-piles">
+        <div class="mini-stock" data-stock="${esc(p.id)}" title="Stock: ${p.stockCount} left">
+          ${p.stockTop ? cardHtml(p.stockTop, { cls: "mini" }) : `<div class="slot mini"></div>`}<b>${p.stockCount}</b></div>
+        <div class="mini-discards">${p.discards
+          .map((d, k) => `<div class="mini-discard" data-discard="${esc(p.id)}:${k}">${d.length ? cardHtml(d.at(-1), { cls: "mini" }) : `<div class="slot mini"></div>`}</div>`)
+          .join("")}</div>
+      </div></li>`;
+  }
+
+  function lastMoveHtml(v) {
+    const m = [...(v.moves || [])].reverse().find((x) => x.to);
+    if (!m || v.status !== "playing") return "";
+    const p = v.players.find((x) => x.id === m.player);
+    if (!p) return "";
+    const who = p.id === v.me ? "You" : esc(p.name);
+    const src = m.from.type === "stock" ? "Stock" : m.from.type === "discard" ? "Discard pile" : "Hand";
+    const where = m.to.type === "build" ? `on pile ${m.to.index + 1}` : "to a discard pile";
+    const verb = m.to.type === "build" ? "played" : "discarded";
+    return `<p class="move-note"><span class="src src-${m.from.type}">${src}</span><span>${who} ${verb} ${cardHtml(m.card, { tag: "span", cls: "tiny", as: m.card.kind === "wild" && m.to.type === "build" ? m.as : null })} ${where}${m.completed ? " · pile done!" : ""}</span></p>`;
+  }
+
+  function gameHtml(v) {
+    const meIdx = v.players.findIndex((p) => p.id === v.me);
+    const me = v.players[meIdx];
+    const myTurn = v.status === "playing" && v.turn === meIdx;
+    const card = myTurn ? selectedCard(v) : null;
+    const turnP = v.players[v.turn];
+
+    const opps = v.players
+      .map((p, i) => ({ p, i }))
+      .filter(({ p }) => p.id !== v.me)
+      .map(({ p, i }) => opponentHtml(p, i, v))
+      .join("");
+
+    const build = v.build
+      .map((pile, i) => {
+        const top = pile.at(-1);
+        const ok = card && fits(card, pile);
+        const cls = card ? (ok ? " ok" : " no") : "";
+        return `<button type="button" class="build${cls}" data-build="${i}" ${card ? "" : 'tabindex="-1"'}
+            aria-label="Building pile ${i + 1}: ${pile.length ? `at ${pile.length}` : "empty"}, needs ${nextFor(pile)}">
+          ${top ? cardHtml(top, { as: top.kind === "wild" ? top.as : null }) : `<div class="slot"><span>1</span></div>`}
+          <span class="need">${pile.length ? `next ${nextFor(pile)}` : "start"}</span></button>`;
+      })
+      .join("");
+
+    let status;
+    if (v.status !== "playing") status = "Game over";
+    else if (myTurn) status = "Your turn";
+    else status = `${esc(turnP.name)} is playing…`;
+
+    const discards = me.discards
+      .map((d, k) => {
+        const top = d.at(-1);
+        const under = d.at(-2);
+        const target = myTurn && ui.sel?.type === "hand";
+        return `<button type="button" class="my-discard${target ? " ok" : ""}${isSel("discard", k) ? " sel" : ""}" data-discard="${esc(me.id)}:${k}" data-my-discard="${k}"
+            aria-label="Your discard pile ${k + 1}${top ? `, top card ${top.kind === "wild" ? "Skip-Bo" : top.n}` : ", empty"}">
+          ${under ? cardHtml(under, { cls: "under" }) : ""}
+          ${top ? cardHtml(top) : `<div class="slot"><span>${k + 1}</span></div>`}
+          ${d.length > 1 ? `<b class="count-badge">${d.length}</b>` : ""}</button>`;
+      })
+      .join("");
+
+    const hand = (me.hand || [])
+      .map((c, i) => cardHtml(c, { tag: "button", attrs: `type="button" data-card="${c.id}" style="--i:${i}"`, cls: `${isSel("hand", c.id) ? "sel" : ""} ${!ui.dealt || ui.newCards?.has(c.id) ? "deal" : ""}` }))
+      .join("");
+    ui.dealt = true;
+    ui.newCards = null;
+
+    const hint = !myTurn
+      ? ""
+      : ui.sel?.type === "hand"
+        ? "Tap a glowing pile to play it, or one of your discard piles to end your turn."
+        : ui.sel
+          ? "Tap a glowing building pile."
+          : "Tap a card, then where it goes. Discard to end your turn.";
+
+    return `<div class="topbar">
+        <span class="room">Room <b>${esc(ui.snap.code)}</b> · Round ${v.round}${ui.snap.offline ? ' <span class="offline">Reconnecting…</span>' : ""}</span>
+        <button type="button" class="link" data-do="leave">Leave</button>
+      </div>
+      <ul class="opps">${opps}</ul>
+      <section class="center">
+        <div class="center-head">
+          <span class="draw-pile" title="Draw pile">${v.drawCount}<small>to draw</small></span>
+          <p class="turn-pill${myTurn ? " mine" : ""}" aria-live="polite">${status}</p>
+          <span class="done-pile" title="Finished cards waiting to be reshuffled">${v.completedCount}<small>finished</small></span>
+        </div>
+        <div class="builds">${build}</div>
+        ${lastMoveHtml(v)}
+      </section>
+      <section class="dock${myTurn ? " mine" : ""}">
+        <div class="dock-row">
+          <button type="button" class="my-stock${isSel("stock") ? " sel" : ""}" data-stock="${esc(me.id)}" ${me.stockTop ? "" : "disabled"}
+              aria-label="Your stock pile, ${me.stockCount} left">
+            ${me.stockCount > 1 ? '<span class="stack-edge"></span>' : ""}
+            ${me.stockTop ? cardHtml(me.stockTop) : `<div class="slot"></div>`}
+            <b class="count-badge stock-count">${me.stockCount}</b>
+            <span class="pile-label">Stock</span></button>
+          <div class="my-discards">${discards}</div>
+        </div>
+        <p class="hint${myTurn ? " strong" : ""}">${hint}</p>
+        <div class="hand">${hand}</div>
+        ${myTurn && !(me.hand || []).length ? `<button type="button" class="btn" data-do="pass">No cards left · end turn</button>` : ""}
+      </section>
+      ${v.status === "finished" ? resultsHtml(v) : ""}`;
+  }
+
+  function resultsHtml(v) {
+    const won = v.winners.includes(v.me);
+    const names = v.winners.map((id) => v.players.find((p) => p.id === id)?.name || "Someone");
+    const rows = v.players
+      .map((p, i) => ({ p, i }))
+      .sort((a, b) => a.p.stockCount - b.p.stockCount);
+    return `<div class="overlay" role="dialog" aria-modal="true" aria-label="Game over"><div class="sheet">
+        <p class="lbl">Round ${v.round} over</p>
+        <h2 class="sheet-title">${won ? "You win! 🏆" : `${esc(names.join(" & "))} ${names.length > 1 ? "win" : "wins"}!`}</h2>
+        <ul class="results">${rows
+          .map(
+            ({ p, i }) => `<li class="${v.winners.includes(p.id) ? "win" : ""}">${avatarHtml(p.name, seatColor(i), p.bot)}
+              <div class="grow"><strong>${esc(p.name)}${p.id === v.me ? " (you)" : ""}</strong>
+                <span class="r-sub">${p.stockCount ? `${p.stockCount} stock card${p.stockCount > 1 ? "s" : ""} left` : "Stock cleared"}</span></div>
+              <span class="r-total">${p.wins}<small>${p.wins === 1 ? "win" : "wins"}</small></span></li>`
+          )
+          .join("")}</ul>
+        <button type="button" class="btn primary big" data-do="restart">Play again</button>
+        <button type="button" class="link" data-do="leave">Back to the start</button>
+      </div></div>`;
+  }
+
+  function render() {
+    if (drag && drag.moved) {
+      drag.renderLater = true;
+      return;
+    }
+    const s = ui.snap;
+    let body;
+    if (s.screen === "loading") body = `<div class="center-msg"><span class="dots"><i></i><i></i><i></i></span><p>${esc(s.message || "Loading…")}</p></div>`;
+    else if (s.screen === "unavailable") body = `<section class="panel"><h1 class="logo small-logo"><span>Skip</span><span class="dash">·</span><span>Bo</span></h1><p>${esc(s.message)}</p>${webLinkHtml()}</section>`;
+    else if (s.screen === "home") body = homeHtml();
+    else if (s.screen === "lost")
+      body = `<section class="panel lost"><h2>Can't reach room ${esc(s.code)}</h2>
+        <p class="muted">The game server didn't answer. Your game is saved, so you can try again, or start fresh.</p>
+        <div class="row"><button type="button" class="btn primary grow" data-do="retry">Try again</button>
+        <button type="button" class="btn grow" data-do="leave">Back to start</button></div></section>`;
+    else if (s.view.status === "lobby") body = lobbyHtml(s.view);
+    else body = gameHtml(s.view);
+    if (s.screen !== "game" || s.view.status === "lobby") ui.dealt = false;
+    const focusId = document.activeElement && document.activeElement.id;
+    main.className = `wrap screen-${s.screen === "game" ? (s.view.status === "lobby" ? "lobby" : "game") : s.screen}${ui.busy ? " busy" : ""}`;
+    main.innerHTML = body;
+    if (s.view) for (const p of s.view.players) ui.seen.add(p.id);
+    if (focusId) document.getElementById(focusId)?.focus();
+  }
+
+  // ---------- playing a card ----------
+
+  // Plays or discards the selected card onto a target, by tap or by drop.
+  function useTarget(target) {
+    const v = ui.snap.view;
+    if (!v || !ui.sel) return false;
+    if (target.build !== undefined) {
+      const from = ui.sel.type === "hand" ? { type: "hand", cardId: ui.sel.cardId } : { ...ui.sel };
+      act({ type: "play", from, build: Number(target.build) });
+      return true;
+    }
+    if (target.myDiscard !== undefined && ui.sel.type === "hand") {
+      act({ type: "discard", cardId: ui.sel.cardId, pile: Number(target.myDiscard) });
+      return true;
+    }
+    return false;
+  }
+
+  function select(sel) {
+    const same = ui.sel && JSON.stringify(ui.sel) === JSON.stringify(sel);
+    ui.sel = same ? null : sel;
+    render();
+  }
+
+  // Drag a card from your hand, stock or discard pile onto a target.
+  main.addEventListener("pointerdown", (e) => {
+    const v = ui.snap.view;
+    if (!v || v.status !== "playing" || v.players[v.turn].id !== v.me || e.button > 0) return;
+    const el = e.target.closest(".hand .card, .my-stock, .my-discard");
+    if (!el || el.disabled) return;
+    let sel;
+    if (el.dataset.card) sel = { type: "hand", cardId: Number(el.dataset.card) };
+    else if (el.classList.contains("my-stock")) sel = { type: "stock" };
+    else {
+      const k = Number(el.dataset.myDiscard);
+      if (!v.players.find((p) => p.id === v.me).discards[k].length) return;
+      sel = { type: "discard", index: k };
+    }
+    drag = { el, sel, pointerId: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+  });
+
+  addEventListener("pointermove", (e) => {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    if (!drag.moved) {
+      if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 10) return;
+      drag.moved = true;
+      ui.sel = drag.sel;
+      const cardEl = drag.el.matches(".card") ? drag.el : drag.el.querySelector(".card:not(.under)");
+      const r = (cardEl || drag.el).getBoundingClientRect();
+      drag.ghost = document.createElement("div");
+      drag.ghost.className = "fly dragging";
+      drag.ghost.style.cssText = `left:${r.left}px;top:${r.top}px;--w:${r.width}px`;
+      drag.ghost.innerHTML = cardEl ? cardEl.outerHTML : "";
+      drag.offset = { x: drag.x - r.left, y: drag.y - r.top };
+      fxLayer.append(drag.ghost);
+      (cardEl || drag.el).classList.add("lifted");
+      drag.renderLater = false;
+      markTargets();
+    }
+    e.preventDefault();
+    drag.ghost.style.left = `${e.clientX - drag.offset.x}px`;
+    drag.ghost.style.top = `${e.clientY - drag.offset.y}px`;
+    const over = dropTargetAt(e.clientX, e.clientY);
+    main.querySelectorAll(".hover").forEach((x) => x !== over && x.classList.remove("hover"));
+    if (over) over.classList.add("hover");
+  });
+
+  function dropTargetAt(x, y) {
+    const el = document.elementFromPoint(x, y)?.closest("[data-build], [data-my-discard]");
+    return el && main.contains(el) ? el : null;
+  }
+
+  // Highlights where the dragged card can go without a full redraw.
+  function markTargets() {
+    const v = ui.snap.view;
+    const card = selectedCard(v);
+    main.querySelectorAll("[data-build]").forEach((el) => {
+      const ok = card && fits(card, v.build[Number(el.dataset.build)]);
+      el.classList.toggle("ok", !!ok);
+      el.classList.toggle("no", !ok);
+    });
+    main.querySelectorAll("[data-my-discard]").forEach((el) => el.classList.toggle("ok", ui.sel?.type === "hand"));
+  }
+
+  function endDrag(e) {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    const d = drag;
+    drag = null;
+    if (!d.moved) return;
+    d.ghost.remove();
+    ui.justDragged = true;
+    setTimeout(() => (ui.justDragged = false), 300);
+    const over = e.type === "pointerup" ? dropTargetAt(e.clientX, e.clientY) : null;
+    if (!over || !useTarget(over.dataset)) {
+      ui.sel = null;
+      render();
+    }
+  }
+  addEventListener("pointerup", endDrag);
+  addEventListener("pointercancel", endDrag);
+
+  // ---------- events ----------
+
+  const nameValue = () => (document.getElementById("name")?.value || "").trim();
+
+  root.addEventListener("click", (e) => {
+    const t = e.target.closest("button");
+    if (!t || t.disabled || !main.contains(t) || ui.justDragged) return;
+    const d = t.dataset;
+    const v = ui.snap.view;
+    const myTurn = v && v.status === "playing" && v.players[v.turn].id === v.me;
+
+    if (d.build !== undefined) {
+      if (!myTurn) return;
+      if (!ui.sel) return setToast("Pick a card first: your hand, stock or a discard pile.");
+      useTarget(d);
+      return;
+    }
+    if (d.myDiscard !== undefined) {
+      if (!myTurn) return;
+      if (ui.sel?.type === "hand") return useTarget(d);
+      const k = Number(d.myDiscard);
+      if (!v.players.find((p) => p.id === v.me).discards[k].length) return;
+      return select({ type: "discard", index: k });
+    }
+    if (t.classList.contains("my-stock")) return myTurn && select({ type: "stock" });
+    if (d.card !== undefined) return myTurn ? select({ type: "hand", cardId: Number(d.card) }) : setToast("Wait for your turn.");
+    if (d.size !== undefined) return act({ type: "stockSize", size: d.size === "" ? null : Number(d.size) });
+    if (d.kick) return act({ type: "leave", playerId: d.kick });
+    if (d.join) {
+      const name = nameValue();
+      if (!name && d.mine === undefined) return setToast("Enter your name first.");
+      return run(() => transport.joinGame(d.join, name));
+    }
+    switch (d.do) {
+      case "create": {
+        const name = nameValue();
+        if (!name) return setToast("Enter your name first.");
+        return run(() => transport.createGame(name));
+      }
+      case "solo": {
+        const name = nameValue();
+        if (!name) return setToast("Enter your name first.");
+        return run(async () => {
+          await transport.createGame(name);
+          await transport.act({ type: "addBot" });
+          await transport.act({ type: "addBot" });
+          await transport.act({ type: "stockSize", size: 20 });
+          await transport.act({ type: "start" });
+        });
+      }
+      case "add-bot":
+        return act({ type: "addBot" });
+      case "start":
+        return act({ type: "start" });
+      case "restart":
+        return act({ type: "restart" });
+      case "pass":
+        return act({ type: "pass" });
+      case "copy": {
+        const url = transport.shareUrl(ui.snap.code);
+        const done = () => setToast("Invite link copied.");
+        if (navigator.clipboard) navigator.clipboard.writeText(url).then(done, () => setToast(url));
+        else setToast(url);
+        return;
+      }
+      case "retry":
+        return transport.retry();
+      case "leave":
+        ui.sel = null;
+        return run(() => transport.leave());
+    }
+  });
+
+  root.addEventListener("input", (e) => {
+    if (e.target.id === "name") ui.name = e.target.value;
+    if (e.target.id === "join-code") ui.code = e.target.value;
+  });
+
+  root.addEventListener("submit", (e) => {
+    if (e.target.id !== "join-form") return;
+    e.preventDefault();
+    const code = (document.getElementById("join-code")?.value || "").trim().toUpperCase();
+    const name = nameValue();
+    if (!name) return setToast("Enter your name first.");
+    if (!/^[A-Z]{5}$/.test(code)) return setToast("Room codes are 5 letters.");
+    run(() => transport.joinGame(code, name));
+  });
+
+  render();
+}
+
+// Artifact transport: every game is one document in the artifact's shared store
+// (games/<CODE>). Each client runs the rules engine itself and saves the result,
+// holding a short lease on the document so two players never write at once.
+function createArtifactTransport() {
+  const LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const STALE_MS = 6 * 60 * 60 * 1000;
+  const holder = "t" + Math.random().toString(36).slice(2);
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const saved = {
+    get(k) {
+      try {
+        return localStorage.getItem(k);
+      } catch {
+        return null;
+      }
+    },
+    set(k, v) {
+      try {
+        if (v == null) localStorage.removeItem(k);
+        else localStorage.setItem(k, v);
+      } catch {}
+    },
+  };
+
+  let emit = () => {};
+  let db = null;
+  let uid = null;
+  let defaultName = saved.get("sb-name") || "";
+  let code = saved.get("sb-code");
+  let games = [];
+  let current = null; // latest game state for `code`
+  let unsubGame = null;
+  let botTimer = null;
+
+  // Everyone at the table offers to play a waiting bot's turn; the lease and the
+  // version check make sure only one of them actually does.
+  function scheduleBot() {
+    clearTimeout(botTimer);
+    if (!current || !botToMove(current)) return;
+    const seq = current.seq;
+    const gameCode = code;
+    botTimer = setTimeout(() => {
+      withLease(gameCode, (s) => (s && botToMove(s) && s.seq === seq ? safeBotStep(s) : s)).catch(() => {});
+    }, BOT_DELAY_MS + Math.random() * 600);
+  }
+
+  function publish() {
+    if (code && current) {
+      emit({ screen: "game", code, view: viewFor(current, uid) });
+      scheduleBot();
+      return;
+    }
+    if (code) return emit({ screen: "loading", message: "Opening your game…" });
+    const now = Date.now();
+    const list = games
+      .filter((g) => g.state && now - g.updated < STALE_MS && g.state.players.some((p) => !p.bot))
+      .filter((g) => g.state.status === "lobby" || g.state.players.some((p) => p.id === uid))
+      .filter((g) => g.state.status !== "finished")
+      .map((g) => ({
+        code: g.code,
+        hostName: (g.state.players.find((p) => p.id === g.state.host) || g.state.players[0] || {}).name || "Someone",
+        players: g.state.players.length,
+        mine: g.state.players.some((p) => p.id === uid),
+      }));
+    emit({ screen: "home", defaultName, games: list });
+  }
+
+  function watchGame(next) {
+    if (unsubGame) unsubGame();
+    unsubGame = null;
+    clearTimeout(botTimer);
+    code = next;
+    current = null;
+    saved.set("sb-code", code);
+    if (!code) return publish();
+    unsubGame = db.doc("games/" + code).onSnapshot(
+      (snap) => {
+        const data = snap.exists ? snap.data() : null;
+        if (!data || !data.state || !data.state.players.some((p) => p.id === uid)) {
+          // The game is gone or we were removed from it.
+          return watchGame(null);
+        }
+        current = data.state;
+        publish();
+      },
+      () => watchGame(null)
+    );
+    publish();
+  }
+
+  // Read-modify-write under a short lease. `change` gets the current state
+  // (or null) and returns the next one; engine errors propagate to the UI.
+  async function withLease(gameCode, change) {
+    const ref = db.doc("games/" + gameCode);
+    let lease = null;
+    for (let i = 0; i < 20; i++) {
+      lease = await ref.acquire({ holder, ttlMs: 1500 });
+      if (lease.acquired) break;
+      await sleep(150 + Math.random() * 150);
+    }
+    if (!lease || !lease.acquired) throw new Error("The table is busy. Try again.");
+    const snap = await ref.get();
+    const before = snap.exists && snap.data().state ? snap.data().state : null;
+    const state = change(before);
+    if (state === before) return state;
+    await ref.set({ code: gameCode, state, updated: Date.now() });
+    return state;
+  }
+
+  function writeError(e) {
+    if (e && e.code === "invalid_argument") return new Error("You can watch but not play here yet. Ask the owner to invite you by email as an Editor, or use Play on the web below.");
+    if (e && e.code === "quota_exceeded") return new Error("This page has run out of room for new games. Ask the owner to clear old ones.");
+    return e;
+  }
+
+  return {
+    listsGames: true,
+    webUrl: "https://skip-bo-friends.netlify.app/",
+    shareHint: () => "Friends open this same page and tap Join under Open tables.",
+    async init(fn) {
+      emit = fn;
+      emit({ screen: "loading", message: "Connecting…" });
+      const [dbApi, userApi] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
+      db = dbApi;
+      uid = userApi ? await userApi.id() : null;
+      if (!db || !uid) {
+        return emit({ screen: "unavailable", message: "Playing here needs a Claude account. You can play the same game on the web without one." });
+      }
+      if (!defaultName && userApi) defaultName = ((await userApi.me()).name || "").split(" ")[0];
+      db.collection("games")
+        .orderBy("updated", "desc")
+        .limit(30)
+        .onSnapshot(
+          (snap) => {
+            games = snap.docs.map((d) => d.data());
+            if (!code) publish();
+          },
+          () => {}
+        );
+      watchGame(code);
+    },
+    async createGame(name) {
+      saved.set("sb-name", name);
+      defaultName = name;
+      for (let i = 0; i < 8; i++) {
+        const c = Array.from({ length: 5 }, () => LETTERS[Math.floor(Math.random() * LETTERS.length)]).join("");
+        let created = false;
+        try {
+          await withLease(c, (s) => {
+            if (s) return s; // code taken, try another
+            created = true;
+            return createGame(uid, name);
+          });
+        } catch (e) {
+          throw writeError(e);
+        }
+        if (created) return watchGame(c);
+      }
+      throw new Error("Couldn't create a game. Try again.");
+    },
+    async joinGame(c, name) {
+      if (name) {
+        saved.set("sb-name", name);
+        defaultName = name;
+      }
+      try {
+        await withLease(c, (s) => {
+          if (!s) throw new Error("That game no longer exists.");
+          return applyAction(s, uid, { type: "join", name });
+        });
+      } catch (e) {
+        throw writeError(e);
+      }
+      watchGame(c);
+    },
+    async act(action) {
+      try {
+        current = await withLease(code, (s) => {
+          if (!s) throw new Error("That game no longer exists.");
+          return applyAction(s, uid, action);
+        });
+      } catch (e) {
+        throw writeError(e);
+      }
+      publish();
+    },
+    async leave() {
+      if (current && current.status === "lobby") {
+        const leaving = code;
+        await withLease(leaving, (s) => (s ? applyAction(s, uid, { type: "leave" }) : s)).catch(() => {});
+      }
+      watchGame(null);
+    },
+  };
+}
+
+mountApp(document.getElementById("app"), createArtifactTransport());
+})();
+</script>

@@ -1,0 +1,9 @@
+{
+  "name": "Skip-Bo",
+  "short_name": "Skip-Bo",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a2427",
+  "theme_color": "#0a2427",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
