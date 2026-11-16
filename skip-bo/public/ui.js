@@ -320,6 +320,13 @@ export function mountApp(root, transport) {
     </ul>`;
   }
 
+  // Only Z's own screen ever gets this switch: the server sends the setting
+  // to nobody else, so for everyone else `god` is undefined.
+  function godSwitchHtml(me) {
+    if (!me || me.god === undefined) return "";
+    return `<button type="button" class="god-switch${me.god ? " on" : ""}" data-do="god" role="switch" aria-checked="${!!me.god}" title="God Mode"><span class="track"><span class="knob"></span></span>God</button>`;
+  }
+
   function lobbyHtml(v) {
     const isHost = v.host === v.me;
     const code = String(ui.snap.code || "");
@@ -368,7 +375,10 @@ export function mountApp(root, transport) {
                 ${v.players.length < 2 ? "Waiting for a friend…" : `Deal ${v.players.length} players in`}</button>`
             : `<p class="waiting"><span class="dots"><i></i><i></i><i></i></span>Waiting for ${esc(v.players.find((p) => p.id === v.host)?.name || "the host")} to deal</p>`
         }
-        <button type="button" class="link" data-do="leave">Leave table</button>
+        <div class="lobby-foot">
+          <button type="button" class="link" data-do="leave">Leave table</button>
+          ${godSwitchHtml(v.players.find((p) => p.id === v.me))}
+        </div>
       </section>`;
   }
 
@@ -459,6 +469,7 @@ export function mountApp(root, transport) {
 
     return `<div class="topbar">
         <span class="room">Room <b>${esc(ui.snap.code)}</b> · Round ${v.round}${ui.snap.offline ? ' <span class="offline">Reconnecting…</span>' : ""}</span>
+        ${godSwitchHtml(me)}
         <button type="button" class="link" data-do="leave">Leave</button>
       </div>
       <ul class="opps">${opps}</ul>
@@ -694,6 +705,10 @@ export function mountApp(root, transport) {
         return act({ type: "restart" });
       case "pass":
         return act({ type: "pass" });
+      case "god": {
+        const me = v.players.find((p) => p.id === v.me);
+        return act({ type: "godMode", on: !me.god });
+      }
       case "copy": {
         const url = transport.shareUrl(ui.snap.code);
         const done = () => setToast("Invite link copied.");

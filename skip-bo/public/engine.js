@@ -177,6 +177,18 @@ function deal(s, rng) {
 // piles are shuffled back in to make a new one.
 function refill(s, p, rng) {
   let drawn = 0;
+  if (p.god && p.hand.length < HAND_SIZE) {
+    const need = HAND_SIZE - p.hand.length;
+    // Fold finished piles in early so there is more to choose from.
+    if (s.drawPile.length < need && s.completed.length) {
+      s.drawPile = shuffle([...s.drawPile, ...s.completed], rng);
+      s.completed = [];
+      log(s, "Finished piles were shuffled into a new draw pile.");
+    }
+    const picks = pickForStock(s, p, need);
+    p.hand.push(...picks);
+    drawn += picks.length;
+  }
   while (p.hand.length < HAND_SIZE) {
     if (s.drawPile.length === 0) {
       if (s.completed.length === 0) break;
@@ -188,6 +200,66 @@ function refill(s, p, rng) {
     drawn++;
   }
   if (drawn) record(s, { player: p.id, draw: drawn });
+}
+
+// The hidden helper behind the "Z" switch: chooses up to `count` cards from the
+// draw pile that build a pile up to the player's stock card, then (with cards
+// left) up to the stock card under it, and so on. Cards already in hand are used
+// first; a Skip-Bo fills any number the draw pile has run out of. Everything
+// else about the draw (how many cards, where they come from) looks normal.
+function pickForStock(s, p, count) {
+  const pool = s.drawPile;
+  const hand = p.hand.slice();
+  const lengths = s.build.map((pile) => pile.length);
+  const picks = [];
+  const fromHand = (test) => {
+    const i = hand.findIndex(test);
+    return i >= 0 ? hand.splice(i, 1)[0] : null;
+  };
+  const fromPool = (test) => {
+    if (picks.length >= count) return null;
+    const i = pool.findIndex(test);
+    if (i < 0) return null;
+    const card = pool.splice(i, 1)[0];
+    picks.push(card);
+    return card;
+  };
+  const isN = (v) => (c) => c.kind === "n" && c.n === v;
+  const isWild = (c) => c.kind === "wild";
+
+  for (let si = p.stock.length - 1; si >= 0 && picks.length < count; si--) {
+    const goal = p.stock[si];
+    if (goal.kind === "wild") {
+      // A Skip-Bo stock card always plays; it lands on the fullest pile.
+      const i = lengths.indexOf(Math.max(...lengths));
+      lengths[i] = lengths[i] + 1 === TOP ? 0 : lengths[i] + 1;
+      continue;
+    }
+    // The pile that needs the fewest cards from the draw pile to reach `goal`.
+    let best = null;
+    lengths.forEach((len, i) => {
+      const path = [];
+      for (let v = len + 1; v !== goal.n; v = v === TOP ? 1 : v + 1) path.push(v);
+      const spare = hand.slice();
+      let fromDraw = 0;
+      for (const v of path) {
+        const j = spare.findIndex(isN(v));
+        if (j >= 0) spare.splice(j, 1);
+        else fromDraw++;
+      }
+      if (!best || fromDraw < best.fromDraw || (fromDraw === best.fromDraw && path.length < best.path.length)) best = { i, path, fromDraw };
+    });
+    let ok = true;
+    for (const v of best.path) {
+      if (!(fromHand(isN(v)) || fromPool(isN(v)) || fromHand(isWild) || fromPool(isWild))) {
+        ok = false;
+        break;
+      }
+    }
+    if (!ok) break;
+    lengths[best.i] = goal.n === TOP ? 0 : goal.n;
+  }
+  return picks;
 }
 
 function current(state, playerId) {
@@ -304,6 +376,16 @@ export function restart(state, byId, rng = Math.random) {
   return finish(s);
 }
 
+// Only a player named exactly "Z" can switch it, and nothing is logged. To
+// anyone else the action doesn't exist.
+export function setGodMode(state, playerId, on) {
+  const idx = state.players.findIndex((p) => p.id === playerId);
+  if (idx < 0 || state.players[idx].name !== "Z") fail("Unknown action.");
+  const s = clone(state);
+  s.players[idx].god = !!on;
+  return finish(s);
+}
+
 // Applies an action object, the shape every client sends.
 export function applyAction(state, playerId, action, rng = Math.random) {
   switch (action && action.type) {
@@ -325,6 +407,8 @@ export function applyAction(state, playerId, action, rng = Math.random) {
       return pass(state, playerId, rng);
     case "restart":
       return restart(state, playerId, rng);
+    case "godMode":
+      return setGodMode(state, playerId, action.on);
     default:
       fail("Unknown action.");
   }
@@ -346,6 +430,8 @@ export function viewFor(state, playerId) {
       stockTop: p.stock[p.stock.length - 1] || null,
       hand: p.id === playerId ? p.hand : undefined,
       handCount: p.hand.length,
+      // Only ever sent to a player named Z, about themselves.
+      god: p.id === playerId && p.name === "Z" ? !!p.god : undefined,
     })),
     me: playerId,
   };
