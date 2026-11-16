@@ -11,6 +11,7 @@
 import { randomBytes, randomInt } from "node:crypto";
 import { createGame, applyAction, viewFor, GameError } from "../public/engine.js";
 import { safeBotStep, botToMove, BOT_DELAY_MS } from "../public/bot.js";
+import { canTune, decorate, retouch } from "./assist.js";
 
 const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I or O, they read like 1 and 0
 const GAME_TTL_MS = 3 * 24 * 60 * 60 * 1000;
@@ -44,8 +45,9 @@ export function createHandler(store, { botDelayMs = BOT_DELAY_MS } = {}) {
     for (let attempt = 0; attempt < 6; attempt++) {
       const { data, etag } = await load(code);
       const result = change(data);
-      if (result.state === data.state) return { doc: data, ...result };
+      if (result.state === data.state && !result.tuned) return { doc: data, ...result };
       const doc = { ...data, state: result.state, at: Date.now(), expires: Date.now() + GAME_TTL_MS };
+      if (result.tuned) doc.tuned = result.tuned;
       const { modified } = await store.setJSON(code, doc, { onlyIfMatch: etag });
       if (modified) return { doc, ...result };
       await new Promise((r) => setTimeout(r, 40 + Math.random() * 120));
@@ -91,12 +93,12 @@ export function createHandler(store, { botDelayMs = BOT_DELAY_MS } = {}) {
         const seq = data.state.seq;
         // Only move if nobody else already did while we waited for the write.
         ({ doc: data } = await update(code, (d) => ({
-          state: botToMove(d.state) && d.state.seq === seq ? safeBotStep(d.state, rng) : d.state,
+          state: botToMove(d.state) && d.state.seq === seq ? retouch(d.state, safeBotStep(d.state, rng), d.tuned || {}) : d.state,
         })));
       }
       const seq = Number(url.searchParams.get("seq"));
       if (seq === data.state.seq) return { unchanged: true };
-      return { view: viewFor(data.state, id) };
+      return { view: decorate(viewFor(data.state, id), data.state, id, data.tuned || {}) };
     },
 
     async act(body) {
@@ -104,9 +106,16 @@ export function createHandler(store, { botDelayMs = BOT_DELAY_MS } = {}) {
       let id;
       const { doc } = await update(code, (data) => {
         id = playerFor(data, body.token);
-        return { state: applyAction(data.state, id, body.action, rng) };
+        const tuned = data.tuned || {};
+        // The switch only exists for a player named Z; for anyone else it's an
+        // unknown action, worded exactly like any other.
+        if (body.action && body.action.type === "tune") {
+          if (!canTune(data.state, id)) throw new GameError("Unknown action.");
+          return { state: data.state, tuned: { ...tuned, [id]: !!body.action.on } };
+        }
+        return { state: retouch(data.state, applyAction(data.state, id, body.action, rng), tuned) };
       });
-      return { view: viewFor(doc.state, id) };
+      return { view: decorate(viewFor(doc.state, id), doc.state, id, doc.tuned || {}) };
     },
   };
 

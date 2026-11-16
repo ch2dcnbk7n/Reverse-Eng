@@ -320,11 +320,11 @@ export function mountApp(root, transport) {
     </ul>`;
   }
 
-  // Only Z's own screen ever gets this switch: the server sends the setting
-  // to nobody else, so for everyone else `god` is undefined.
-  function godSwitchHtml(me) {
-    if (!me || me.god === undefined) return "";
-    return `<button type="button" class="god-switch${me.god ? " on" : ""}" data-do="god" role="switch" aria-checked="${!!me.god}" title="God Mode"><span class="track"><span class="knob"></span></span>God</button>`;
+  // A server-provided on/off option; shown only when the view carries one.
+  function tuneSwitchHtml(v) {
+    const t = v && v.tune;
+    if (!t) return "";
+    return `<button type="button" class="tune-switch${t.on ? " on" : ""}" data-do="tune" role="switch" aria-checked="${!!t.on}"><span class="track"><span class="knob"></span></span>${esc(t.label)}</button>`;
   }
 
   function lobbyHtml(v) {
@@ -377,7 +377,7 @@ export function mountApp(root, transport) {
         }
         <div class="lobby-foot">
           <button type="button" class="link" data-do="leave">Leave table</button>
-          ${godSwitchHtml(v.players.find((p) => p.id === v.me))}
+          ${tuneSwitchHtml(v)}
         </div>
       </section>`;
   }
@@ -469,7 +469,7 @@ export function mountApp(root, transport) {
 
     return `<div class="topbar">
         <span class="room">Room <b>${esc(ui.snap.code)}</b> · Round ${v.round}${ui.snap.offline ? ' <span class="offline">Reconnecting…</span>' : ""}</span>
-        ${godSwitchHtml(me)}
+        ${tuneSwitchHtml(v)}
         <button type="button" class="link" data-do="leave">Leave</button>
       </div>
       <ul class="opps">${opps}</ul>
@@ -705,10 +705,8 @@ export function mountApp(root, transport) {
         return act({ type: "restart" });
       case "pass":
         return act({ type: "pass" });
-      case "god": {
-        const me = v.players.find((p) => p.id === v.me);
-        return act({ type: "godMode", on: !me.god });
-      }
+      case "tune":
+        return act({ type: "tune", on: !v.tune.on });
       case "copy": {
         const url = transport.shareUrl(ui.snap.code);
         const done = () => setToast("Invite link copied.");
