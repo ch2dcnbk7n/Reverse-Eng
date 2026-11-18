@@ -230,6 +230,9 @@ export function mountApp(root, transport) {
     ui.newCards = new Set((mine(snap.view) || []).filter((c) => !had.has(c.id)).map((c) => c.id));
     if (info && info.deal) ui.dealt = false;
     if (ui.sel && !selectedCard(snap.view)) ui.sel = null;
+    const v2 = snap.view;
+    const stillMine = v2 && v2.status === "playing" && v2.players[v2.turn].id === v2.me;
+    if (ui.pending && (!stillMine || ui.sel?.type !== "hand" || ui.sel.cardId !== ui.pending.cardId)) ui.pending = null;
     render();
     playMoves(info, snap.view);
     celebrate(prev, snap.view);
@@ -462,7 +465,8 @@ export function mountApp(root, transport) {
         const top = d.at(-1);
         const under = d.at(-2);
         const target = myTurn && ui.sel?.type === "hand";
-        return `<button type="button" class="my-discard${target ? " ok" : ""}${isSel("discard", k) ? " sel" : ""}" data-discard="${esc(me.id)}:${k}" data-my-discard="${k}"
+        const pending = ui.pending && ui.pending.pile === k;
+        return `<button type="button" class="my-discard${target ? " ok" : ""}${pending ? " pending" : ""}${isSel("discard", k) ? " sel" : ""}" data-discard="${esc(me.id)}:${k}" data-my-discard="${k}"
             aria-label="Your discard pile ${k + 1}${top ? `, top card ${top.kind === "wild" ? "Skip-Bo" : top.n}` : ", empty"}">
           ${under ? cardHtml(under, { cls: "under" }) : ""}
           ${top ? cardHtml(top) : `<div class="slot"></div>`}
@@ -512,11 +516,23 @@ export function mountApp(root, transport) {
             <span class="pile-label">Stock</span></button>
           <div class="my-discards">${discards}</div>
         </div>
+        ${myTurn && ui.pending ? confirmHtml(me) : ""}
         <p class="hint${myTurn ? " strong" : ""}">${hint}</p>
         <div class="hand">${hand}</div>
         ${myTurn && !(me.hand || []).length ? `<button type="button" class="btn" data-do="pass">No cards left · end turn</button>` : ""}
       </section>
       ${v.status === "finished" ? resultsHtml(v) : ""}`;
+  }
+
+  function confirmHtml(me) {
+    const card = (me.hand || []).find((c) => c.id === ui.pending.cardId);
+    if (!card) return "";
+    return `<div class="confirm" role="alertdialog" aria-label="Confirm discard">
+      <p>Discard ${cardHtml(card, { tag: "span", cls: "tiny" })} to pile ${ui.pending.pile + 1} and end your turn?</p>
+      <div class="confirm-actions">
+        <button type="button" class="btn" data-do="cancel-discard">Keep playing</button>
+        <button type="button" class="btn primary" data-do="confirm-discard">Discard</button>
+      </div></div>`;
   }
 
   function resultsHtml(v) {
@@ -578,13 +594,18 @@ export function mountApp(root, transport) {
       return true;
     }
     if (target.myDiscard !== undefined && ui.sel.type === "hand") {
-      act({ type: "discard", cardId: ui.sel.cardId, pile: Number(target.myDiscard) });
+      // Discarding ends your turn, so ask first.
+      ui.pending = { cardId: ui.sel.cardId, pile: Number(target.myDiscard) };
+      fxLayer.querySelector(".callout").classList.remove("go"); // nothing on top of the question
+      render();
+      main.querySelector('[data-do="confirm-discard"]')?.focus();
       return true;
     }
     return false;
   }
 
   function select(sel) {
+    ui.pending = null;
     const same = ui.sel && JSON.stringify(ui.sel) === JSON.stringify(sel);
     ui.sel = same ? null : sel;
     render();
@@ -672,8 +693,15 @@ export function mountApp(root, transport) {
   const nameValue = () => (document.getElementById("name")?.value || "").trim();
 
   root.addEventListener("click", (e) => {
+    // A tap anywhere outside the question (and not on another discard pile) cancels it.
+    if (ui.pending && !e.target.closest(".confirm, [data-my-discard]")) {
+      ui.pending = null;
+      render();
+      if (!e.target.closest("button")) return;
+    }
     const t = e.target.closest("button");
-    if (!t || t.disabled || !main.contains(t) || ui.justDragged) return;
+    // Right after a drag, ignore the stray tap on cards and piles, never on the question's buttons.
+    if (!t || t.disabled || !main.contains(t) || (ui.justDragged && !t.closest(".confirm"))) return;
     const d = t.dataset;
     const v = ui.snap.view;
     const myTurn = v && v.status === "playing" && v.players[v.turn].id === v.me;
@@ -735,11 +763,27 @@ export function mountApp(root, transport) {
         else setToast(url);
         return;
       }
+      case "confirm-discard": {
+        const pd = ui.pending;
+        ui.pending = null;
+        if (pd) act({ type: "discard", cardId: pd.cardId, pile: pd.pile });
+        return;
+      }
+      case "cancel-discard":
+        ui.pending = null;
+        return render();
       case "retry":
         return transport.retry();
       case "leave":
         ui.sel = null;
         return run(() => transport.leave());
+    }
+  });
+
+  addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && ui.pending) {
+      ui.pending = null;
+      render();
     }
   });
 

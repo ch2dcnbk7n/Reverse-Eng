@@ -330,6 +330,29 @@ p { margin: 0; }
 .my-discard.ok .slot { border-color: transparent; color: var(--ink); }
 .sel .card:not(.under), .card.sel { box-shadow: 0 0 0 2px var(--accent), 0 12px 24px rgb(0 0 0 / 0.5); translate: 0 -10px; }
 .my-stock.sel .card, .my-discard.sel .card:not(.under) { translate: 0 -8px; }
+/* "Discard and end your turn?" floats above your edge of the table. */
+.confirm {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  translate: -50% 0;
+  width: min(420px, calc(100% - 32px));
+  background: var(--felt-deep);
+  border: 1px solid var(--accent);
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 18px 40px rgb(0 0 0 / 0.55);
+  z-index: 8;
+  animation: drop 0.22s ease-out both;
+}
+.confirm p { font-size: 14px; font-weight: 600; text-align: center; }
+.confirm .card.tiny { --w: 22px; }
+.confirm-actions { display: flex; gap: 8px; }
+.confirm-actions .btn { flex: 1; min-height: 40px; }
+.my-discard.pending .card:not(.under), .my-discard.pending .slot { box-shadow: 0 0 0 2px var(--accent), 0 6px 14px rgb(0 0 0 / 0.35); border-color: transparent; }
 .hint { text-align: center; font-size: 12px; color: var(--muted); min-height: 1.2em; }
 .hint.strong { color: var(--ink); }
 .hand { --w: 62px; display: flex; justify-content: center; gap: 8px; min-height: 92px; padding-top: 6px; }
