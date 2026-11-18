@@ -3,10 +3,12 @@
 // transport) and in the Claude artifact (shared-store transport).
 import { MAX_PLAYERS, STOCK_CHOICES, officialStock, nextFor, fits } from "./engine.js";
 
+const dirOf = (v) => (v && v.direction) || "up";
+
 const esc = (v) =>
   String(v ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]);
 
-const SEAT_COLORS = ["#ff8a1f", "#2f8cff", "#27b36a", "#e5484d", "#a970ff", "#00b8b0"];
+const SEAT_COLORS = ["#f2a65a", "#7fb2ff", "#6fd19a", "#ef7d84", "#c3a3ff", "#5fd0c6"];
 const seatColor = (i) => SEAT_COLORS[i % SEAT_COLORS.length];
 const initials = (name) =>
   String(name || "?")
@@ -26,10 +28,11 @@ function cardHtml(card, { tag = "div", attrs = "", cls = "", as = null } = {}) {
   if (!card) return "";
   if (card.kind === "wild") {
     return `<${tag} class="card wild ${cls}" ${attrs} aria-label="Skip-Bo${as ? ` as ${as}` : ""}">
-      <span class="sb">SKIP<br>BO</span>${as ? `<span class="as">${as}</span>` : ""}</${tag}>`;
+      <span class="sb"><b>Skip</b><b>Bo</b></span>${as ? `<span class="as">${as}</span>` : ""}</${tag}>`;
   }
-  return `<${tag} class="card c-${band(card.n)} ${cls}" ${attrs} aria-label="${card.n}">
-    <span class="corner">${card.n}</span><span class="pip">${card.n}</span></${tag}>`;
+  // 6 and 9 are underlined, as on printed cards, so upside-down corners read right.
+  return `<${tag} class="card c-${band(card.n)}${card.n === 6 || card.n === 9 ? " u" : ""} ${cls}" ${attrs} aria-label="${card.n}">
+    <span class="corner tl">${card.n}</span><span class="pip">${card.n}</span><span class="corner br">${card.n}</span></${tag}>`;
 }
 
 function avatarHtml(name, color, bot = false, extra = "") {
@@ -48,7 +51,7 @@ function createFx(layer) {
     const dpr = devicePixelRatio;
     canvas.width = innerWidth * dpr;
     canvas.height = innerHeight * dpr;
-    const colors = ["#ff8a1f", "#2f8cff", "#27b36a", "#e5484d", "#fff3d6"];
+    const colors = ["#f2711c", "#1f5cbd", "#17824a", "#c42d37", "#f6f2e9"];
     const x0 = at ? at.x * dpr : canvas.width * 0.5;
     const y0 = at ? at.y * dpr : canvas.height * 0.35;
     for (let i = 0; i < amount; i++) {
@@ -296,14 +299,15 @@ export function mountApp(root, transport) {
           </form></section>`;
     return `<header class="hero">
         ${heroCards()}
-        <h1 class="logo"><span>Skip</span><span class="dash">·</span><span>Bo</span></h1>
-        <p class="tagline-main">Empty your stock pile first. Build 1 to 12 in the middle with up to ${MAX_PLAYERS} friends.</p>
+        <p class="kicker">A card game for 2–${MAX_PLAYERS}</p>
+        <h1 class="logo">Skip&#8209;Bo</h1>
+        <p class="tagline-main">Build the middle piles from 1 to 12, or backwards from 12 to 1. First to empty their stock pile wins.</p>
       </header>
       <section class="panel">
         <label><span class="lbl">Your name</span>
           <input id="name" maxlength="20" autocomplete="nickname" value="${nameVal}" placeholder="What do your friends call you?"></label>
         <button type="button" class="btn primary big" data-do="create">Start a table</button>
-        <button type="button" class="btn big bots" data-do="solo">${BOT_ICON}Practice against 2 bots</button>
+        <button type="button" class="btn big ghost bots" data-do="solo">${BOT_ICON}Practice against 2 bots</button>
       </section>
       ${joinBlock}
       ${webLinkHtml()}
@@ -313,7 +317,7 @@ export function mountApp(root, transport) {
   function rulesHtml() {
     return `<ul class="rule-list">
       <li><b>Goal</b><span>Be first to play every card in your stock pile. Only its top card is face up.</span></li>
-      <li><b>Build</b><span>Four shared building piles go 1, 2, 3… up to 12. A finished pile is cleared and its cards are shuffled back in later.</span></li>
+      <li><b>Build</b><span>Four shared building piles go 1, 2, 3… up to 12, or in a backwards game 12, 11… down to 1. A finished pile is cleared and its cards are shuffled back in later.</span></li>
       <li><b>Skip-Bo</b><span>Wild cards stand in for any number.</span></li>
       <li><b>Your turn</b><span>You start with five cards in hand. Play from your hand, the top of your stock, or the top of your discard piles. Play all five and you draw five more.</span></li>
       <li><b>End</b><span>Finish your turn by putting one hand card on one of your four discard piles.</span></li>
@@ -359,7 +363,20 @@ export function mountApp(root, transport) {
             ? `<li class="empty-seat"><button type="button" class="add-bot" data-do="add-bot"><span class="avatar ghost">+</span><span class="seat-label">Add a bot</span></button></li>`
             : `<li class="empty-seat"><span class="avatar ghost"></span></li>`
         ).join("")}</ul>
-        <div class="stock-size">
+        <div class="option">
+          <span class="lbl">Building piles</span>
+          ${
+            isHost
+              ? `<div class="chips" role="group" aria-label="Building pile direction">${[
+                  ["up", "Count up · 1→12"],
+                  ["down", "Count down · 12→1"],
+                ]
+                  .map(([d, label]) => `<button type="button" class="chip${dirOf(v) === d ? " on" : ""}" data-dir="${d}">${label}</button>`)
+                  .join("")}</div>`
+              : `<p>${dirOf(v) === "down" ? "Counting down, 12 to 1" : "Counting up, 1 to 12"}</p>`
+          }
+        </div>
+        <div class="option">
           <span class="lbl">Stock pile size</span>
           ${
             isHost
@@ -426,12 +443,12 @@ export function mountApp(root, transport) {
     const build = v.build
       .map((pile, i) => {
         const top = pile.at(-1);
-        const ok = card && fits(card, pile);
+        const ok = card && fits(card, pile, dirOf(v));
         const cls = card ? (ok ? " ok" : " no") : "";
         return `<button type="button" class="build${cls}" data-build="${i}" ${card ? "" : 'tabindex="-1"'}
-            aria-label="Building pile ${i + 1}: ${pile.length ? `at ${pile.length}` : "empty"}, needs ${nextFor(pile)}">
-          ${top ? cardHtml(top, { as: top.kind === "wild" ? top.as : null }) : `<div class="slot"><span>1</span></div>`}
-          <span class="need">${pile.length ? `next ${nextFor(pile)}` : "start"}</span></button>`;
+            aria-label="Building pile ${i + 1}: ${pile.length ? `${pile.length} cards` : "empty"}, needs ${nextFor(pile, dirOf(v))}">
+          ${top ? cardHtml(top, { as: top.kind === "wild" ? top.as : null }) : `<div class="slot"><span>${nextFor(pile, dirOf(v))}</span></div>`}
+          <span class="need">${pile.length ? `next ${nextFor(pile, dirOf(v))}` : "start"}</span></button>`;
       })
       .join("");
 
@@ -448,7 +465,7 @@ export function mountApp(root, transport) {
         return `<button type="button" class="my-discard${target ? " ok" : ""}${isSel("discard", k) ? " sel" : ""}" data-discard="${esc(me.id)}:${k}" data-my-discard="${k}"
             aria-label="Your discard pile ${k + 1}${top ? `, top card ${top.kind === "wild" ? "Skip-Bo" : top.n}` : ", empty"}">
           ${under ? cardHtml(under, { cls: "under" }) : ""}
-          ${top ? cardHtml(top) : `<div class="slot"><span>${k + 1}</span></div>`}
+          ${top ? cardHtml(top) : `<div class="slot"></div>`}
           ${d.length > 1 ? `<b class="count-badge">${d.length}</b>` : ""}</button>`;
       })
       .join("");
@@ -476,7 +493,10 @@ export function mountApp(root, transport) {
       <section class="center">
         <div class="center-head">
           <span class="draw-pile" title="Draw pile">${v.drawCount}<small>to draw</small></span>
-          <p class="turn-pill${myTurn ? " mine" : ""}" aria-live="polite">${status}</p>
+          <div class="center-mid">
+            <p class="turn-pill${myTurn ? " mine" : ""}" aria-live="polite">${status}</p>
+            <span class="dir-tag">${dirOf(v) === "down" ? "Counting down · 12→1" : "Counting up · 1→12"}</span>
+          </div>
           <span class="done-pile" title="Finished cards waiting to be reshuffled">${v.completedCount}<small>finished</small></span>
         </div>
         <div class="builds">${build}</div>
@@ -507,7 +527,7 @@ export function mountApp(root, transport) {
       .sort((a, b) => a.p.stockCount - b.p.stockCount);
     return `<div class="overlay" role="dialog" aria-modal="true" aria-label="Game over"><div class="sheet">
         <p class="lbl">Round ${v.round} over</p>
-        <h2 class="sheet-title">${won ? "You win! 🏆" : `${esc(names.join(" & "))} ${names.length > 1 ? "win" : "wins"}!`}</h2>
+        <h2 class="sheet-title">${won ? "You win" : `${esc(names.join(" & "))} ${names.length > 1 ? "win" : "wins"}`}</h2>
         <ul class="results">${rows
           .map(
             ({ p, i }) => `<li class="${v.winners.includes(p.id) ? "win" : ""}">${avatarHtml(p.name, seatColor(i), p.bot)}
@@ -529,7 +549,7 @@ export function mountApp(root, transport) {
     const s = ui.snap;
     let body;
     if (s.screen === "loading") body = `<div class="center-msg"><span class="dots"><i></i><i></i><i></i></span><p>${esc(s.message || "Loading…")}</p></div>`;
-    else if (s.screen === "unavailable") body = `<section class="panel"><h1 class="logo small-logo"><span>Skip</span><span class="dash">·</span><span>Bo</span></h1><p>${esc(s.message)}</p>${webLinkHtml()}</section>`;
+    else if (s.screen === "unavailable") body = `<section class="panel"><h1 class="logo small-logo">Skip&#8209;Bo</h1><p>${esc(s.message)}</p>${webLinkHtml()}</section>`;
     else if (s.screen === "home") body = homeHtml();
     else if (s.screen === "lost")
       body = `<section class="panel lost"><h2>Can't reach room ${esc(s.code)}</h2>
@@ -623,7 +643,7 @@ export function mountApp(root, transport) {
     const v = ui.snap.view;
     const card = selectedCard(v);
     main.querySelectorAll("[data-build]").forEach((el) => {
-      const ok = card && fits(card, v.build[Number(el.dataset.build)]);
+      const ok = card && fits(card, v.build[Number(el.dataset.build)], dirOf(v));
       el.classList.toggle("ok", !!ok);
       el.classList.toggle("no", !ok);
     });
@@ -674,6 +694,7 @@ export function mountApp(root, transport) {
     if (t.classList.contains("my-stock")) return myTurn && select({ type: "stock" });
     if (d.card !== undefined) return myTurn ? select({ type: "hand", cardId: Number(d.card) }) : setToast("Wait for your turn.");
     if (d.size !== undefined) return act({ type: "stockSize", size: d.size === "" ? null : Number(d.size) });
+    if (d.dir) return act({ type: "direction", dir: d.dir });
     if (d.kick) return act({ type: "leave", playerId: d.kick });
     if (d.join) {
       const name = nameValue();

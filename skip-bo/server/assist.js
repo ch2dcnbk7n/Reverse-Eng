@@ -4,7 +4,7 @@
 // swapped, after the engine draws them normally, for cards from the same draw
 // pile that build a pile up to their stock card. Card counts, reshuffle timing
 // and the game log stay exactly as they would have been.
-import { TOP } from "../public/engine.js";
+import { TOP, nextFor, stepAfter } from "../public/engine.js";
 
 export const canTune = (state, playerId) => state.players.some((p) => p.id === playerId && p.name === "Z");
 
@@ -20,7 +20,9 @@ export function decorate(view, state, playerId, tuned) {
 export function pickForStock(s, p, count) {
   const pool = s.drawPile;
   const hand = p.hand.slice();
+  const dir = s.direction || "up";
   const lengths = s.build.map((pile) => pile.length);
+  const next = (len) => nextFor({ length: len }, dir);
   const picks = [];
   const fromHand = (test) => {
     const i = hand.findIndex(test);
@@ -47,7 +49,7 @@ export function pickForStock(s, p, count) {
     let best = null;
     lengths.forEach((len, i) => {
       const path = [];
-      for (let v = len + 1; v !== goal.n; v = v === TOP ? 1 : v + 1) path.push(v);
+      for (let v = next(len); v !== goal.n; v = stepAfter(v, dir)) path.push(v);
       const spare = hand.slice();
       let fromDraw = 0;
       for (const v of path) {
@@ -65,7 +67,9 @@ export function pickForStock(s, p, count) {
       }
     }
     if (!ok) break;
-    lengths[best.i] = goal.n === TOP ? 0 : goal.n;
+    // The pile now holds everything up to the goal; a full pile is cleared.
+    const len = dir === "down" ? TOP + 1 - goal.n : goal.n;
+    lengths[best.i] = len === TOP ? 0 : len;
   }
   return picks;
 }

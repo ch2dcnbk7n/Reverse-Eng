@@ -238,3 +238,51 @@ test("bots finish a pile to reach a low stock card instead of stalling", () => {
   s = botStep(s);
   assert.equal(s.build.filter((p) => p.length === 1).length, 1, "then the stock 1 started it again");
 });
+
+test("count-down games: piles start at 12, run to 1, and Skip-Bo stands in going down", () => {
+  let s = E.addPlayer(E.createGame("a", "A"), "b", "B");
+  assert.throws(() => E.setDirection(s, "b", "down"), /Only the host/);
+  assert.throws(() => E.setDirection(s, "a", "sideways"), /counting up or counting down/);
+  s = E.setDirection(s, "a", "down");
+  s = E.startGame(s, "a", seeded(3));
+  const me = s.players[s.turn];
+  me.hand = [n(1), n(12), W(), n(10), n(11)];
+  const [one, twelve, wild, ten] = me.hand;
+  assert.throws(() => E.play(s, me.id, { type: "hand", cardId: one.id }, 0), /starts with a 12/);
+  s = E.play(s, me.id, { type: "hand", cardId: twelve.id }, 0);
+  assert.throws(() => E.play(s, me.id, { type: "hand", cardId: ten.id }, 0), /needs a 11/);
+  s = E.play(s, me.id, { type: "hand", cardId: wild.id }, 0);
+  assert.equal(s.build[0].at(-1).as, 11, "the Skip-Bo counts as an 11");
+  s = E.play(s, me.id, { type: "hand", cardId: ten.id }, 0);
+  assert.equal(E.nextFor(s.build[0], "down"), 9);
+  // A pile that reaches 1 is finished and cleared.
+  s.build[2] = Array.from({ length: 11 }, (_, i) => ({ ...n(12 - i), as: 12 - i }));
+  s.drawPile.splice(0, 11);
+  const p = s.players[s.turn];
+  p.hand.push(n(1));
+  s.drawPile.pop();
+  s = E.play(s, p.id, { type: "hand", cardId: p.hand.at(-1).id }, 2);
+  assert.equal(s.build[2].length, 0);
+  assert.ok(s.moves.at(-1).completed);
+  assert.equal(total(s), 162);
+});
+
+for (const seed of [1, 2, 3, 4]) {
+  test(`count-down bot games finish with a winner (seed ${seed})`, () => {
+    const rng = seeded(seed * 31337);
+    let s = E.createGame("h", "Host");
+    for (let i = 1; i < 2 + (seed % 4); i++) s = E.addBot(s, "h");
+    s = E.setDirection(s, "h", "down");
+    s = E.setStockSize(s, "h", seed % 2 ? 10 : null);
+    s = E.startGame(s, "h", rng);
+    s.players[0].bot = true;
+    let steps = 0;
+    while (s.status === "playing") {
+      assert.ok(++steps < 60000, "game should finish");
+      s = safeBotStep(s, rng);
+      assert.equal(total(s), 162);
+      for (const pile of s.build) pile.forEach((c, i) => assert.equal(c.as, 12 - i));
+    }
+    assert.ok(!s.log.some((l) => l.startsWith("Nobody can move")), "won outright, not by stalemate");
+  });
+}

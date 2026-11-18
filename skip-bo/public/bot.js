@@ -1,7 +1,7 @@
 // Computer players. A bot makes one move at a time (a play or its closing
 // discard) through the same engine actions a person uses, so other players can
 // watch each card land and the bot can never break a rule.
-import { PILES, TOP, nextFor, fits, play, discard, pass } from "./engine.js";
+import { PILES, nextFor, fits, stepAfter, play, discard, pass } from "./engine.js";
 
 // Pause before each bot move.
 export const BOT_DELAY_MS = 700;
@@ -31,6 +31,7 @@ function nextStockTop(state) {
 // Picks this bot's next play, or null when it should discard instead.
 export function choosePlay(state) {
   const me = state.players[state.turn];
+  const dir = state.direction || "up";
   const piles = state.build;
   const all = sources(me);
   const stockTop = me.stock[me.stock.length - 1];
@@ -38,10 +39,10 @@ export function choosePlay(state) {
 
   // 1. Play the stock card whenever it fits; that's how you win.
   if (stockTop) {
-    const target = piles.findIndex((p) => fits(stockTop, p));
+    const target = piles.findIndex((p) => fits(stockTop, p, dir));
     if (target >= 0) {
       // A Skip-Bo from the stock goes on the pile closest to finishing.
-      const best = stockTop.kind === "wild" ? bestPileForWild(piles, danger) : target;
+      const best = stockTop.kind === "wild" ? bestPileForWild(piles, danger, dir) : target;
       return { from: { type: "stock" }, build: best };
     }
   }
@@ -56,9 +57,9 @@ export function choosePlay(state) {
     const goal = stockTop.n;
     let best = null;
     piles.forEach((pile, i) => {
-      const need = nextFor(pile);
+      const need = nextFor(pile, dir);
       const path = [];
-      for (let v = need; v !== goal; v = v === TOP ? 1 : v + 1) path.push(v);
+      for (let v = need; v !== goal; v = stepAfter(v, dir)) path.push(v);
       // Can every step on the way be covered?
       const gap = path.filter((v) => !naturals.some((s) => s.card.n === v)).length;
       if (gap > wilds.length) return;
@@ -77,8 +78,8 @@ export function choosePlay(state) {
   for (const s of all) {
     if (s.card.kind !== "n" || s.from.type === "stock") continue;
     piles.forEach((pile, i) => {
-      if (!fits(s.card, pile)) return;
-      const after = s.card.n === TOP ? 1 : s.card.n + 1; // a 12 finishes the pile
+      if (!fits(s.card, pile, dir)) return;
+      const after = stepAfter(s.card.n, dir); // the last number finishes the pile
       if (danger && after === danger) return; // would set up the next player
       safe.push({ ...s, build: i });
     });
@@ -91,7 +92,7 @@ export function choosePlay(state) {
   //    play beats waiting, even one that helps the next player.
   if (!me.hand.length) {
     for (const s of [...naturals, ...wilds]) {
-      const i = piles.findIndex((p) => fits(s.card, p));
+      const i = piles.findIndex((p) => fits(s.card, p, dir));
       if (i >= 0) return { from: s.from, build: i };
     }
   }
@@ -102,11 +103,11 @@ function preferDiscards(list) {
   return list.find((s) => s.from.type === "discard") || list[0] || null;
 }
 
-function bestPileForWild(piles, danger) {
+function bestPileForWild(piles, danger, dir) {
   let best = 0;
   let bestLen = -1;
   piles.forEach((pile, i) => {
-    if (danger && nextFor(pile) + 1 === danger) return;
+    if (danger && stepAfter(nextFor(pile, dir), dir) === danger) return;
     if (pile.length > bestLen) {
       best = i;
       bestLen = pile.length;
@@ -115,10 +116,12 @@ function bestPileForWild(piles, danger) {
   return best;
 }
 
-// Ends the turn: keep Skip-Bo cards, stack runs downwards on discard piles
-// (a 7 on an 8) so they come back in order, and dump high cards first.
+// Ends the turn: keep Skip-Bo cards, stack runs on discard piles so they come
+// back in playing order (counting up, a 7 on an 8; counting down, an 8 on a 7),
+// and dump the cards furthest from use first.
 export function chooseDiscard(state) {
   const me = state.players[state.turn];
+  const dir = state.direction || "up";
   if (!me.hand.length) return null;
   const naturals = me.hand.filter((c) => c.kind === "n");
   const pool = naturals.length ? naturals : me.hand;
@@ -127,9 +130,9 @@ export function chooseDiscard(state) {
     for (let i = 0; i < PILES; i++) {
       const pile = me.discards[i];
       const top = pile[pile.length - 1];
-      let score = card.kind === "n" ? card.n / 2 : 0;
+      let score = card.kind === "n" ? (dir === "down" ? 13 - card.n : card.n) / 2 : 0;
       if (!top) score += 4;
-      else if (top.kind === "n" && card.kind === "n" && top.n === card.n + 1) score += 8;
+      else if (top.kind === "n" && card.kind === "n" && stepAfter(card.n, dir) === top.n) score += 8;
       else if (top.kind === "n" && card.kind === "n" && top.n === card.n) score += 6;
       else score -= pile.length; // don't bury long piles
       if (!best || score > best.score) best = { cardId: card.id, pile: i, score };

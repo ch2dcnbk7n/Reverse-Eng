@@ -40,9 +40,13 @@ export const cardLabel = (card) => (card.kind === "wild" ? "Skip-Bo" : String(ca
 // The official stock is 30 cards with up to 4 players and 20 with 5 or 6.
 export const officialStock = (players) => (players <= 4 ? 30 : 20);
 
-// A building pile always runs 1, 2, 3… so the next card it needs is its length + 1.
-export const nextFor = (pile) => pile.length + 1;
-export const fits = (card, pile) => card.kind === "wild" || card.n === nextFor(pile);
+// Building piles count up (1, 2, 3… 12) or, in backwards games, down (12, 11… 1),
+// so the next number a pile needs follows from its length.
+export const DIRECTIONS = ["up", "down"];
+export const nextFor = (pile, dir = "up") => (dir === "down" ? TOP - pile.length : pile.length + 1);
+export const fits = (card, pile, dir = "up") => card.kind === "wild" || card.n === nextFor(pile, dir);
+// The number a pile needs after `v`; past the last number a fresh pile starts.
+export const stepAfter = (v, dir = "up") => (dir === "down" ? (v === 1 ? TOP : v - 1) : v === TOP ? 1 : v + 1);
 
 // ---------- game flow ----------
 
@@ -53,6 +57,7 @@ export function createGame(hostId, hostName) {
     status: "lobby",
     host: hostId,
     stockSize: null, // null = official size for the player count
+    direction: "up",
     players: [newPlayer(hostId, hostName)],
     turn: 0,
     round: 0,
@@ -141,6 +146,15 @@ export function setStockSize(state, byId, size) {
   return finish(s);
 }
 
+export function setDirection(state, byId, dir) {
+  if (state.status !== "lobby") fail("The counting direction is set before the game starts.");
+  if (byId !== state.host) fail("Only the host can change the counting direction.");
+  if (!DIRECTIONS.includes(dir)) fail("Pick counting up or counting down.");
+  const s = clone(state);
+  s.direction = dir;
+  return finish(s);
+}
+
 export function startGame(state, byId, rng = Math.random) {
   if (state.status !== "lobby") fail("The game has already started.");
   if (byId !== state.host) fail("Only the host can start the game.");
@@ -169,7 +183,8 @@ function deal(s, rng) {
   s.passes = 0;
   s.status = "playing";
   s.turn = Math.floor(rng() * s.players.length);
-  log(s, `Round ${s.round}: ${size} stock cards each. ${s.players[s.turn].name} goes first.`);
+  const order = s.direction === "down" ? ", counting down from 12" : "";
+  log(s, `Round ${s.round}: ${size} stock cards each${order}. ${s.players[s.turn].name} goes first.`);
   refill(s, s.players[s.turn], rng);
 }
 
@@ -226,9 +241,10 @@ export function play(state, playerId, from, buildIndex, rng = Math.random) {
   const src = source(p, from);
   const pile = s.build[buildIndex];
   if (!pile) fail("Pick one of the four building piles.");
-  const need = nextFor(pile);
-  if (!fits(src.card, pile)) {
-    fail(pile.length ? `That pile needs a ${need} or a Skip-Bo.` : "A building pile starts with a 1 or a Skip-Bo.");
+  const dir = s.direction || "up";
+  const need = nextFor(pile, dir);
+  if (!fits(src.card, pile, dir)) {
+    fail(pile.length ? `That pile needs a ${need} or a Skip-Bo.` : `A building pile starts with a ${need} or a Skip-Bo.`);
   }
   const card = src.take();
   pile.push({ ...card, as: need });
@@ -315,6 +331,8 @@ export function applyAction(state, playerId, action, rng = Math.random) {
       return addBot(state, playerId);
     case "stockSize":
       return setStockSize(state, playerId, action.size ?? null);
+    case "direction":
+      return setDirection(state, playerId, action.dir);
     case "start":
       return startGame(state, playerId, rng);
     case "play":

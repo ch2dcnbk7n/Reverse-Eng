@@ -100,13 +100,20 @@ test("Z can turn it off at any point, including mid-game and on someone else's t
 function greedyStep(s) {
   const z = s.players[s.turn];
   const top = z.stock.at(-1);
-  const fit = (card) => s.build.findIndex((pile) => E.fits(card, pile));
+  const dir = s.direction;
+  const fit = (card) => s.build.findIndex((pile) => E.fits(card, pile, dir));
   if (top && fit(top) >= 0) return E.play(s, z.id, { type: "stock" }, fit(top));
-  const gap = (pile) => (top.kind === "wild" ? 0 : (top.n - (pile.length + 2) + 12) % 12);
+  // Steps a pile still needs after this play before the stock card fits it.
+  const gap = (pile) => {
+    if (top.kind === "wild") return 0;
+    let steps = 0;
+    for (let v = E.stepAfter(E.nextFor(pile, dir), dir); v !== top.n && steps < 13; v = E.stepAfter(v, dir)) steps++;
+    return steps;
+  };
   let best = null;
   for (const card of z.hand) {
     s.build.forEach((pile, i) => {
-      if (!E.fits(card, pile)) return;
+      if (!E.fits(card, pile, dir)) return;
       const score = gap(pile) + (card.kind === "wild" ? 0.5 : 0);
       if (!best || score < best.score) best = { card, i, score };
     });
@@ -116,12 +123,12 @@ function greedyStep(s) {
 }
 
 test("switched on, Z plays a stock card on nearly every turn; draws and reshuffles look normal", () => {
-  const rate = (on) => {
+  const rate = (on, dir = "up") => {
     let turns = 0, scored = 0;
     for (let seed = 1; seed <= 40; seed++) {
       const rng = seeded(seed);
       const tuned = on ? { z: true } : {};
-      let s = E.addBot(E.createGame("z", "Z"), "z");
+      let s = E.setDirection(E.addBot(E.createGame("z", "Z"), "z"), "z", dir);
       s = retouch(s, E.startGame(s, "z", rng), tuned);
       let seen = 0, steps = 0;
       while (s.status === "playing" && seen < 3 && steps++ < 3000) {
@@ -143,9 +150,11 @@ test("switched on, Z plays a stock card on nearly every turn; draws and reshuffl
     }
     return scored / turns;
   };
-  const on = rate(true);
-  const off = rate(false);
-  console.log(`# stock card played on ${(on * 100).toFixed(0)}% of Z's turns switched on, ${(off * 100).toFixed(0)}% off`);
-  assert.ok(on >= 0.9);
-  assert.ok(off < on);
+  for (const dir of ["up", "down"]) {
+    const on = rate(true, dir);
+    const off = rate(false, dir);
+    console.log(`# counting ${dir}: stock card played on ${(on * 100).toFixed(0)}% of Z's turns switched on, ${(off * 100).toFixed(0)}% off`);
+    assert.ok(on >= 0.9);
+    assert.ok(off < on);
+  }
 });
